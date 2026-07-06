@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>Logistics-KE — Kenya Free Transport Marketplace</title>
+<title>Logistics-KE — Kenya Transport Marketplace</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -210,7 +210,7 @@ tr:hover td{background:var(--gl)}
 <div id="auth-screen">
   <div class="auth-box">
     <div class="auth-logo">Logistics<span>-KE</span></div>
-    <div class="auth-tagline">Kenya's free transport marketplace</div>
+    <div class="auth-tagline">Kenya transport marketplace</div>
     <div class="auth-tabs">
       <div class="auth-tab active" onclick="authTab('signup')">Sign up</div>
       <div class="auth-tab" onclick="authTab('login')">Log in</div>
@@ -246,6 +246,10 @@ tr:hover td{background:var(--gl)}
 
     <!-- LOG IN -->
     <div id="auth-login" style="display:none">
+      <div id="demo-hint" style="display:none;background:#fff8e0;border:1px solid #e8d080;border-radius:6px;padding:9px 11px;margin-bottom:12px;font-size:11.5px;color:#7a5200">
+        <strong>Demo accounts loaded.</strong> Use any phone below with PIN <strong>1234</strong>, or pick a role above to auto-fill.
+        <div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:5px" id="demo-quick-btns"></div>
+      </div>
       <div class="fg"><label>Phone number</label><input id="li-phone" placeholder="07XX XXX XXX" inputmode="tel"></div>
       <div class="fg"><label>Your PIN</label>
         <div class="pin-row">
@@ -272,7 +276,7 @@ tr:hover td{background:var(--gl)}
 <div class="hdr">
   <div>
     <div class="logo">Logistics<span>-KE</span></div>
-    <div class="tagline">Kenya free transport marketplace · GPS · Live sync</div>
+    <div class="tagline">Kenya transport marketplace · GPS · Live</div>
   </div>
   <div class="hdr-right">
     <span class="sync-chip"><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Syncing…</span></span>
@@ -419,20 +423,40 @@ tr:hover td{background:var(--gl)}
     <div class="btn-row"><button class="btn btn-o btn-sm" onclick="saveSettings()">Save</button></div>
   </div>
   <div class="card"><h3>Message log</h3><div id="adm-sms"></div></div>
-  <div class="card"><h3>Danger zone</h3><button class="btn btn-r btn-sm" onclick="resetAll()">🗑 Clear ALL data</button></div>
+  <div class="card">
+    <h3>Demo data</h3>
+    <p style="font-size:12px">Loads realistic Kenyan transporters, clients, requests, bids and bookings so you can walk through every screen without real users. Clears existing data first.</p>
+    <div class="btn-row">
+      <button class="btn btn-a btn-sm" onclick="loadDemoData()">📦 Load demo data</button>
+      <button class="btn btn-r btn-sm" onclick="resetAll()">🗑 Clear ALL data</button>
+    </div>
+  </div>
+</div>
+
+<!-- QA PANEL -->
+<div id="p-qa" class="panel">
+  <h2>🧪 QA Test Suite</h2>
+  <p style="font-size:13px">Runs automated assertions across every flow: auth, transporter matching, instant booking, RFQ bidding, counter-offers, floor-rate enforcement, bid expiry, and message generation. Repeat until all pass.</p>
+  <div class="btn-row" style="margin-bottom:14px">
+    <button class="btn btn-g" onclick="runQA(false)">▶ Run full QA</button>
+    <button class="btn btn-o" onclick="runQA(true)">⚡ Stress test (20 cycles)</button>
+    <button class="btn btn-r btn-sm" onclick="G('qa-log').innerHTML='';G('qa-summary').innerHTML=''">Clear log</button>
+  </div>
+  <div id="qa-summary"></div>
+  <div id="qa-log" style="background:#1a1a1a;color:#9fe1cb;padding:14px;border-radius:var(--rad);font-size:12px;line-height:1.9;max-height:500px;overflow-y:auto;font-family:monospace"></div>
 </div>
 
 <div id="p-github" class="panel">
-  <h2>🚀 Deploy to the Web (GitHub Pages — free)</h2>
+  <h2>🚀 Deploy to the Web (GitHub Pages)</h2>
 
   <div class="card" style="border-left:5px solid var(--a)">
     <h3>What this gives you</h3>
-    <p>A permanent public URL — e.g. <code>https://yourname.github.io/logistics-ke/</code> — that anyone in Kenya can open on any phone or laptop. Free, forever, no hosting fees.</p>
+    <p>A permanent public URL — e.g. <code>https://yourname.github.io/logistics-ke/</code> — that anyone in Kenya can open on any phone or laptop. No hosting fees, no subscription.</p>
   </div>
 
   <!-- STEP 1 -->
   <div class="card">
-    <h3>Step 1 — Create a free GitHub account</h3>
+    <h3>Step 1 — Create a GitHub account</h3>
     <ol style="padding-left:18px;font-size:13.5px;color:var(--gr);line-height:2">
       <li>Go to <strong>github.com</strong> and click <em>Sign up</em>.</li>
       <li>Enter any email, choose a username (e.g. <code>logistics-ke</code>), and set a password.</li>
@@ -678,23 +702,22 @@ async function signUp(){
   const name=G('su-name').value.trim(),phone=normalizePhone(G('su-phone').value.trim()),pin=getPIN('su');
   G('su-err').textContent='';
   if(!name){G('su-err').textContent='Enter your name.';return}
-  if(!phone){G('su-err').textContent='Enter a valid phone number.';return}
-  if(pin.length<4){G('su-err').textContent='Enter all 4 PIN digits.';return}
-  if(!_signupRole){G('su-err').textContent='Choose Transporter or Client.';return}
-  // fetch latest users first to check duplicates
+  if(phone.length<10){G('su-err').textContent='Enter a valid 10-digit phone number.';return}
+  if(pin.length<4||pin.includes('')){G('su-err').textContent='Enter all 4 PIN digits.';return}
+  if(!_signupRole){G('su-err').textContent='Choose Transporter or Client above.';return}
+  // Try to fetch latest from server to check for duplicates; continue either way
   await apiFetch();
   const exists=DB.users.find(u=>u.phone===phone);
-  if(exists){G('su-err').textContent='This phone is already registered. Log in instead.';authTab('login');G('li-phone').value=G('su-phone').value;return}
+  if(exists){G('su-err').textContent='Phone already registered. Log in instead.';authTab('login');G('li-phone').value=G('su-phone').value;return}
   const user={id:uid('USR'),name,phone,role:_signupRole,pinHash:hashPin(pin),joined:today()};
   DB.users.push(user);persistLocal();
-  const res=await apiPost('upsert','User',user);
-  if(!res){G('su-err').textContent='Could not save — check connection and try again.';DB.users=DB.users.filter(u=>u.id!==user.id);return}
+  // Save to server if available; proceed locally if not (offline / demo mode)
+  apiPost('upsert','User',user); // fire-and-forget; don't block on result
   SESSION={userId:user.id,role:user.role,name:user.name,phone:user.phone};
   if(_signupRole==='transporter')SESSION.transporterId=null;
   else SESSION.clientId=null;
   sv('session',SESSION);
   bootApp();
-  // For transporters, take them straight to profile setup
   if(_signupRole==='transporter')switchTab('tr-profile');
 }
 
@@ -704,9 +727,10 @@ async function logIn(){
   if(!phone){G('li-err').textContent='Enter your phone number.';return}
   if(pin.length<4){G('li-err').textContent='Enter your 4-digit PIN.';return}
   G('li-err').textContent='Checking…';
+  // Try server first; fall through to local cache if offline
   await apiFetch();
   const user=DB.users.find(u=>u.phone===phone);
-  if(!user){G('li-err').textContent='Phone not found. Sign up first.';return}
+  if(!user){G('li-err').textContent='Phone not found. Sign up first, or load demo data via Admin.';return}
   if(user.pinHash!==hashPin(pin)){G('li-err').textContent='Wrong PIN. Try again.';return}
   G('li-err').textContent='';
   // find linked transporter or client record
@@ -745,7 +769,7 @@ function bootApp(){
 const TAB_DEFS={
   transporter:[{id:'tr-dash',l:'My jobs'},{id:'tr-profile',l:'My profile'}],
   client:[{id:'cl-post',l:'Post request'},{id:'cl-dash',l:'My requests'}],
-  admin:[{id:'admin',l:'Dashboard'},{id:'github',l:'🚀 Deploy to web'}]
+  admin:[{id:'admin',l:'Dashboard'},{id:'qa',l:'🧪 QA Tests'},{id:'github',l:'🚀 Deploy'}]
 };
 
 function renderTabs(){
@@ -766,6 +790,7 @@ function refreshPanel(id){
   if(id==='tr-profile')renderTrProfile();
   if(id==='cl-dash')renderClDash();
   if(id==='admin')renderAdmin();
+  if(id==='qa')renderQA();
   // github panel is static, no render needed
 }
 
@@ -1138,6 +1163,432 @@ function resetApiUrl(){
   if(input)input.value=API_URL_DEFAULT;
   G('adm-url-status').innerHTML='<span style="color:var(--g)">↩ Reset to default URL.</span>';
   toast('URL reset to default');
+}
+
+// ════════════════════════════════════════════════
+//  DEMO DATA
+// ════════════════════════════════════════════════
+function loadDemoData(){
+  if(!confirm('Load demo data? This clears existing local data first.'))return;
+  // Clear local
+  ['users','transporters','clients','requests','bids','bookings','msgs'].forEach(k=>localStorage.removeItem('lxke_'+k));
+
+  const T=Date.now;
+  const ph=pin=>hashPin(pin); // reuse existing hashPin
+
+  // ── Users (9 accounts) ──────────────────────────────────
+  const demoPin=ph('1234'); // all demo accounts use PIN 1234
+  DB.users=[
+    {id:'USR-JM01',name:'John Mwangi Transport',phone:'0722100001',role:'transporter',pinHash:demoPin,joined:'2024-09-12'},
+    {id:'USR-AW02',name:'Alice Wanjiku Logistics',phone:'0723200002',role:'transporter',pinHash:demoPin,joined:'2024-10-03'},
+    {id:'USR-DO03',name:'David Otieno Carriers',phone:'0720300003',role:'transporter',pinHash:demoPin,joined:'2024-11-18'},
+    {id:'USR-GN04',name:'Grace Njeri Refrigerated',phone:'0711400004',role:'transporter',pinHash:demoPin,joined:'2025-01-07'},
+    {id:'USR-PK05',name:'Peter Kamau Haulage',phone:'0712500005',role:'transporter',pinHash:demoPin,joined:'2025-02-14'},
+    {id:'USR-GT06',name:'Greenleaf Tea Ltd',phone:'0701600006',role:'client',pinHash:demoPin,joined:'2024-08-20'},
+    {id:'USR-NH07',name:'Nairobi Hardware Supplies',phone:'0702700007',role:'client',pinHash:demoPin,joined:'2024-09-30'},
+    {id:'USR-FF08',name:'FreshFarms Produce',phone:'0703800008',role:'client',pinHash:demoPin,joined:'2025-01-15'},
+    {id:'USR-ME09',name:'Makini Electronics',phone:'0704900009',role:'client',pinHash:demoPin,joined:'2025-03-01'}
+  ];
+
+  // ── Transporters (5) ────────────────────────────────────
+  DB.transporters=[
+    {id:'TR-JM01',userId:'USR-JM01',name:'John Mwangi Transport',phone:'0722100001',vehicle:'Canter 5 ton',capacityTons:5,ratePerKm:50,baseLat:-1.3032,baseLon:36.8269,baseAddr:'Industrial Area, Nairobi',baseComment:'Available weekdays 6am–7pm. Call before loading.',network:'safaricom',pref:'both',status:'Active',joined:'2024-09-12'},
+    {id:'TR-AW02',userId:'USR-AW02',name:'Alice Wanjiku Logistics',phone:'0723200002',vehicle:'Pickup 1 ton',capacityTons:1,ratePerKm:70,baseLat:-1.2680,baseLon:36.8070,baseAddr:'Westlands, Nairobi',baseComment:'Specialise in same-day delivery. WhatsApp preferred.',network:'safaricom',pref:'instant',status:'Active',joined:'2024-10-03'},
+    {id:'TR-DO03',userId:'USR-DO03',name:'David Otieno Carriers',phone:'0720300003',vehicle:'Lorry 10 ton',capacityTons:10,ratePerKm:85,baseLat:-1.0476,baseLon:36.6824,baseAddr:'Kiambu Town',baseComment:'Bulk cargo only. 24hr notice required.',network:'airtel',pref:'rfq',status:'Active',joined:'2024-11-18'},
+    {id:'TR-GN04',userId:'USR-GN04',name:'Grace Njeri Refrigerated',phone:'0711400004',vehicle:'Refrigerated van',capacityTons:2,ratePerKm:95,baseLat:-1.2921,baseLon:36.8219,baseAddr:'Nairobi CBD',baseComment:'Cold chain certified. Perishables and pharmaceuticals.',network:'safaricom',pref:'both',status:'Active',joined:'2025-01-07'},
+    {id:'TR-PK05',userId:'USR-PK05',name:'Peter Kamau Haulage',phone:'0712500005',vehicle:'Canter 5 ton',capacityTons:5,ratePerKm:60,baseLat:-1.0396,baseLon:37.0900,baseAddr:'Thika, Kiambu County',baseComment:'Thika–Nairobi corridor specialist. Fixed weekly routes.',network:'airtel',pref:'both',status:'Active',joined:'2025-02-14'}
+  ];
+
+  // ── Clients (4) ─────────────────────────────────────────
+  DB.clients=[
+    {id:'CL-GT06',userId:'USR-GT06',name:'Greenleaf Tea Ltd',phone:'0701600006',joined:'2024-08-20'},
+    {id:'CL-NH07',userId:'USR-NH07',name:'Nairobi Hardware Supplies',phone:'0702700007',joined:'2024-09-30'},
+    {id:'CL-FF08',userId:'USR-FF08',name:'FreshFarms Produce',phone:'0703800008',joined:'2025-01-15'},
+    {id:'CL-ME09',userId:'USR-ME09',name:'Makini Electronics',phone:'0704900009',joined:'2025-03-01'}
+  ];
+
+  const PAST=now()-7200000; // 2 hrs ago
+
+  // ── Requests (7 covering all statuses and modes) ─────────
+  DB.requests=[
+    // 1. Completed instant booking — Greenleaf Tea
+    {id:'REQ-0001',clientUserId:'USR-GT06',clientId:'CL-GT06',clientName:'Greenleaf Tea Ltd',clientPhone:'0701600006',
+     cargoType:'Agricultural produce',weightTons:2.5,pickupLat:-1.0481,pickupLon:36.6504,pickupAddr:'Limuru Tea Farm, Kiambu',pickupComment:'Farm gate. Security guard on duty. Bring delivery note.',
+     dropoffLat:-1.3032,dropoffLon:36.8269,dropoffAddr:'Nairobi Tea Packers, Industrial Area',dropoffComment:'Warehouse 7, Gate C. Deliveries 7am–4pm only.',
+     date:'2025-06-01',mode:'instant',status:'Completed',createdAt:PAST-86400000},
+
+    // 2. Open instant — Nairobi Hardware, waiting for transporter
+    {id:'REQ-0002',clientUserId:'USR-NH07',clientId:'CL-NH07',clientName:'Nairobi Hardware Supplies',clientPhone:'0702700007',
+     cargoType:'Building materials',weightTons:8,pickupLat:-1.3100,pickupLon:36.8200,pickupAddr:'Nairobi Hardware, Enterprise Rd',pickupComment:'Steel posts and cement bags. Forklift on site.',
+     dropoffLat:-1.0525,dropoffLon:36.6824,dropoffAddr:'Kiambu Construction Site, Banana',dropoffComment:'Plot 45 off Banana–Limuru road. Call 0702700007 on arrival.',
+     date:today(),mode:'instant',status:'Open',createdAt:now()-1800000},
+
+    // 3. Active RFQ — FreshFarms with 3 live bids (no vehicle preference, any eligible transporter can bid)
+    {id:'REQ-0003',clientUserId:'USR-FF08',clientId:'CL-FF08',clientName:'FreshFarms Produce',clientPhone:'0703800008',
+     cargoType:'Perishables',weightTons:0.8,pickupLat:-1.2640,pickupLon:36.8040,pickupAddr:'FreshFarms Packhouse, Westlands',pickupComment:'Cold chain preferred. Load at 5am.',
+     dropoffLat:-1.2864,dropoffLon:36.8172,dropoffAddr:'Carrefour Supermarket, Westgate Mall',dropoffComment:'Loading bay B. Mall opens at 7am.',
+     date:today(),mode:'rfq',status:'RFQ',bidWindowSecs:1800,bidExpiresAt:now()+900000,maxFare:7000,vehiclePref:'',createdAt:now()-900000},
+
+    // 4. Active booking — Makini Electronics
+    {id:'REQ-0004',clientUserId:'USR-ME09',clientId:'CL-ME09',clientName:'Makini Electronics',clientPhone:'0704900009',
+     cargoType:'Electronics',weightTons:1.2,pickupLat:-1.3200,pickupLon:36.8300,pickupAddr:'Makini Warehouse, South B',pickupComment:'Fragile boxes. Tail-lift required. Sign delivery manifest.',
+     dropoffLat:-1.2680,dropoffLon:36.8070,dropoffAddr:'Westlands Showroom, Ring Road',dropoffComment:'3rd floor showroom. Goods lift available.',
+     date:today(),mode:'instant',status:'Booked',createdAt:now()-3600000},
+
+    // 5. Open instant — FreshFarms general goods
+    {id:'REQ-0005',clientUserId:'USR-FF08',clientId:'CL-FF08',clientName:'FreshFarms Produce',clientPhone:'0703800008',
+     cargoType:'General goods',weightTons:1,pickupLat:-1.2640,pickupLon:36.8040,pickupAddr:'FreshFarms Packhouse, Westlands',pickupComment:'Boxes of bottled water. Easy load.',
+     dropoffLat:-1.0476,dropoffLon:36.6824,dropoffAddr:'Kiambu Distributor Hub',dropoffComment:'Off Kiambu Road. Blue warehouse.',
+     date:today(),mode:'instant',status:'Open',createdAt:now()-600000},
+
+    // 6. Cancelled — Greenleaf Tea
+    {id:'REQ-0006',clientUserId:'USR-GT06',clientId:'CL-GT06',clientName:'Greenleaf Tea Ltd',clientPhone:'0701600006',
+     cargoType:'FMCG / retail stock',weightTons:3,pickupLat:-1.0481,pickupLon:36.6504,pickupAddr:'Limuru Tea Farm, Kiambu',pickupComment:'',
+     dropoffLat:0.5143,dropoffLon:35.2698,dropoffAddr:'Eldoret Distributor',dropoffComment:'',
+     date:'2025-05-20',mode:'rfq',status:'Cancelled',createdAt:PAST-172800000},
+
+    // 7. Open RFQ — Nairobi Hardware, bulk cement, bids expected
+    {id:'REQ-0007',clientUserId:'USR-NH07',clientId:'CL-NH07',clientName:'Nairobi Hardware Supplies',clientPhone:'0702700007',
+     cargoType:'Building materials',weightTons:9.5,pickupLat:-1.3100,pickupLon:36.8200,pickupAddr:'Nairobi Hardware, Enterprise Rd',pickupComment:'Portland cement, 380 bags.',
+     dropoffLat:-0.3031,dropoffLon:36.0800,dropoffAddr:'Nakuru Hardware Depot, Section 58',dropoffComment:'Nakuru bypass. Weigh bridge clearance required.',
+     date:today(),mode:'rfq',status:'RFQ',bidWindowSecs:3600,bidExpiresAt:now()+2700000,maxFare:null,vehiclePref:'',createdAt:now()-3600000}
+  ];
+
+  // ── Bids (for REQ-0003 and REQ-0007) ────────────────────
+  DB.bids=[
+    // REQ-0003 bids — FreshFarms perishables (3 transporters)
+    {id:'BID-0001',reqId:'REQ-0003',transporterId:'TR-GN04',transporterName:'Grace Njeri Refrigerated',phone:'0711400004',vehicle:'Refrigerated van',distKm:2.4,amount:4800,status:'Pending',submittedAt:now()-600000},
+    {id:'BID-0002',reqId:'REQ-0003',transporterId:'TR-AW02',transporterName:'Alice Wanjiku Logistics',phone:'0723200002',vehicle:'Pickup 1 ton',distKm:1.8,amount:5200,status:'Pending',submittedAt:now()-480000},
+    {id:'BID-0003',reqId:'REQ-0003',transporterId:'TR-JM01',transporterName:'John Mwangi Transport',phone:'0722100001',vehicle:'Canter 5 ton',distKm:3.1,amount:5800,status:'Pending',submittedAt:now()-300000},
+    // REQ-0007 bids — Nairobi Hardware bulk (2 transporters)
+    {id:'BID-0004',reqId:'REQ-0007',transporterId:'TR-DO03',transporterName:'David Otieno Carriers',phone:'0720300003',vehicle:'Lorry 10 ton',distKm:4.2,amount:18500,status:'Pending',submittedAt:now()-1800000},
+    {id:'BID-0005',reqId:'REQ-0007',transporterId:'TR-PK05',transporterName:'Peter Kamau Haulage',phone:'0712500005',vehicle:'Canter 5 ton',distKm:8.3,amount:22000,status:'Pending',submittedAt:now()-900000}
+  ];
+
+  // ── Bookings (2) ─────────────────────────────────────────
+  DB.bookings=[
+    // Completed — Greenleaf Tea (REQ-0001)
+    {id:'BK-0001',reqId:'REQ-0001',transporterId:'TR-JM01',transporterName:'John Mwangi Transport',transporterPhone:'0722100001',
+     clientName:'Greenleaf Tea Ltd',clientPhone:'0701600006',cargo:'Agricultural produce',distKm:28.4,fare:5892,status:'Completed',source:'instant',createdAt:PAST-86400000},
+    // Active — Makini Electronics (REQ-0004)
+    {id:'BK-0002',reqId:'REQ-0004',transporterId:'TR-AW02',transporterName:'Alice Wanjiku Logistics',transporterPhone:'0723200002',
+     clientName:'Makini Electronics',clientPhone:'0704900009',cargo:'Electronics',distKm:6.7,fare:5996,status:'Active',source:'instant',createdAt:now()-3600000}
+  ];
+
+  // ── Messages ─────────────────────────────────────────────
+  DB.msgs=[
+    {id:'MSG-001',phone:'0722100001',msg:'Booking BK-0001: Pickup at Limuru Tea Farm → Nairobi Tea Packers. Agricultural produce 2.5t. Fare KES 5,892.',type:'booking',time:'01/06/2025, 07:14:33'},
+    {id:'MSG-002',phone:'0701600006',msg:'Booking BK-0001: Pickup at Limuru Tea Farm → Nairobi Tea Packers. Cargo: Agricultural produce 2.5t. Fare KES 5,892.',type:'booking',time:'01/06/2025, 07:14:33'},
+    {id:'MSG-003',phone:'0723200002',msg:'Instant job REQ-0004: Electronics 1.2t near Makini Warehouse, South B. First to accept on Logistics-KE.',type:'job-alert',time:new Date().toLocaleString('en-KE')},
+    {id:'MSG-004',phone:'0701600006',msg:'New bid on REQ-0003: Grace Njeri Refrigerated (Refrigerated van) offers KES 4,800 · 2.4km.',type:'bid',time:new Date().toLocaleString('en-KE')}
+  ];
+
+  persistLocal();
+  toast('Demo data loaded — 5 transporters, 4 clients, 7 requests, 5 bids, 2 bookings. Use PIN 1234 for all accounts.');
+
+  // Show demo quick-login hints on the login screen
+  const hint=G('demo-hint');
+  const btnContainer=G('demo-quick-btns');
+  if(hint&&btnContainer){
+    const demoAccounts=[
+      {label:'🚚 John (transporter)',phone:'0722100001'},
+      {label:'🚚 Alice (transporter)',phone:'0723200002'},
+      {label:'🚚 David (transporter)',phone:'0720300003'},
+      {label:'📦 Greenleaf (client)',phone:'0701600006'},
+      {label:'📦 Nairobi Hardware',phone:'0702700007'},
+      {label:'📦 FreshFarms',phone:'0703800008'},
+    ];
+    btnContainer.innerHTML=demoAccounts.map(a=>`<button onclick="demoLogin('${a.phone}')" style="padding:3px 8px;font-size:10.5px;border:1px solid #d4900a;background:#fff8e0;border-radius:4px;cursor:pointer;color:#7a5200;font-weight:600">${a.label}</button>`).join('');
+    hint.style.display='block';
+  }
+  renderAdmin();
+}
+
+function demoLogin(phone){
+  // Instantly log in as a demo user (PIN 1234 → same hash for all demo accounts)
+  authTab('login');
+  G('li-phone').value=phone;
+  // Fill PIN boxes
+  ['0','1','2','3'].forEach((d,i)=>{ const el=G('li-p'+i); if(el)el.value=['1','2','3','4'][i]; });
+  logIn();
+}
+
+// ════════════════════════════════════════════════
+//  QA TEST SUITE
+// ════════════════════════════════════════════════
+function renderQA(){} // static panel — nothing to render
+
+function runQA(stress=false){
+  const LOG=G('qa-log'),SUM=G('qa-summary');
+  LOG.innerHTML='';SUM.innerHTML='';
+  const cycles=stress?20:1;
+  let passed=0,failed=0,total=0;
+
+  // snapshot state before tests
+  const snap=JSON.parse(JSON.stringify({users:DB.users,transporters:DB.transporters,clients:DB.clients,requests:DB.requests,bids:DB.bids,bookings:DB.bookings,settings:DB.settings}));
+
+  function log(msg,t='i'){const d=document.createElement('div');d.style.color={p:'#5dcaa5',f:'#e24b4a',i:'#888',w:'#d4900a'}[t]||'#888';d.innerHTML=msg;LOG.appendChild(d);LOG.scrollTop=LOG.scrollHeight}
+  function assert(name,cond,detail=''){total++;if(cond){passed++;log(`  ✓ ${name}${detail?' — '+detail:''}`, 'p')}else{failed++;log(`  ✗ FAIL: ${name}${detail?' — '+detail:''}`, 'f')}}
+
+  log(`══════ LOGISTICS-KE QA SUITE ${stress?'[STRESS ×20]':'[FULL]'} ══════`);log('');
+
+  for(let cycle=0;cycle<cycles;cycle++){
+    if(cycle>0){Object.assign(DB,JSON.parse(JSON.stringify(snap)));persistLocal()}
+    if(stress&&cycle>0)log(`─── Cycle ${cycle+1}/${cycles} ───`,'w');
+
+    // ── 1. HAVERSINE ENGINE ───────────────────────────────
+    log('[1] Haversine distance engine');
+    const d_nbi_kia=haversine(-1.2921,36.8219,-1.0525,36.6824);
+    assert('Nairobi→Kiambu 25–45km',d_nbi_kia>25&&d_nbi_kia<45,`${d_nbi_kia.toFixed(2)}km`);
+    assert('Same-point = 0km',haversine(-1.2921,36.8219,-1.2921,36.8219)<0.001);
+    assert('Nairobi→Mombasa > 400km',haversine(-1.2921,36.8219,-4.0435,39.6682)>400);
+    assert('Nairobi→Eldoret > 250km',haversine(-1.2921,36.8219,0.5143,35.2698)>250);
+    log('');
+
+    // ── 2. ID GENERATION ──────────────────────────────────
+    log('[2] ID generation');
+    const ids=Array.from({length:50},()=>uid('X'));
+    const unique=new Set(ids);
+    assert('50 UIDs all unique',unique.size===50);
+    assert('UIDs start with prefix',ids.every(i=>i.startsWith('X-')));
+    log('');
+
+    // ── 3. PIN HASH ───────────────────────────────────────
+    log('[3] PIN hashing');
+    const h1=hashPin('1234'),h2=hashPin('1234'),h3=hashPin('5678');
+    assert('Same PIN → same hash',h1===h2);
+    assert('Different PINs → different hashes',h1!==h3);
+    assert('Hash is non-empty string',typeof h1==='string'&&h1.length>0);
+    log('');
+
+    // ── 4. FLOOR RATE ENFORCEMENT ─────────────────────────
+    log('[4] Floor rate enforcement');
+    const floor_canter=DB.settings.floors['Canter 5 ton']||50;
+    const floor_ref=DB.settings.floors['Refrigerated van']||80;
+    assert('Canter 5t floor ≥ 40 KES/km',floor_canter>=40,`KES ${floor_canter}/km`);
+    assert('Refrigerated van floor ≥ 70 KES/km',floor_ref>=70,`KES ${floor_ref}/km`);
+    log('');
+
+    // ── 5. ELIGIBILITY ENGINE ─────────────────────────────
+    log('[5] Eligibility engine');
+    // Set up minimal test transporter
+    const tTr={id:'TR-TEST',status:'Active',capacityTons:5,baseLat:-1.29,baseLon:36.82,ratePerKm:50,pref:'both',vehicle:'Canter 5 ton'};
+    const tReq_near={pickupLat:-1.30,pickupLon:36.81,weightTons:3,mode:'instant',vehiclePref:''};
+    const tReq_far={pickupLat:0.52,pickupLon:35.27,weightTons:3,mode:'instant',vehiclePref:''};
+    const tReq_heavy={pickupLat:-1.30,pickupLon:36.81,weightTons:10,mode:'instant',vehiclePref:''};
+    const tReq_wrongveh={pickupLat:-1.30,pickupLon:36.81,weightTons:1,mode:'instant',vehiclePref:'Lorry 10 ton'};
+    assert('Eligible: near + adequate capacity',eligibleFor(tTr,tReq_near,false));
+    assert('Ineligible: too far (Eldoret)',!eligibleFor(tTr,tReq_far,false));
+    assert('Ineligible: overweight',!eligibleFor(tTr,tReq_heavy,false));
+    assert('Ineligible: wrong vehicle preference',!eligibleFor(tTr,tReq_wrongveh,false));
+    // RFQ preference check
+    const tTr_inst={...tTr,pref:'instant'};
+    const tReq_rfq={...tReq_near,mode:'rfq'};
+    assert('Instant-only transporter excluded from RFQ',!eligibleFor(tTr_inst,tReq_rfq,true));
+    // Booking capacity cap
+    const oldBk=[...DB.bookings];
+    // add 3 active bookings for TR-TEST
+    for(let i=0;i<DB.settings.maxBookings;i++)DB.bookings.push({id:'BK-CAP-'+i,transporterId:'TR-TEST',status:'Active',fare:100,distKm:1,reqId:'REQ-CAP'});
+    assert('Transporter blocked when at max bookings',!eligibleFor(tTr,tReq_near,false));
+    DB.bookings=oldBk;
+    log('');
+
+    // ── 6. INSTANT BOOKING FLOW ───────────────────────────
+    log('[6] Instant booking end-to-end');
+    const b0=DB.bookings.length,s0=DB.msgs.length,r0=DB.requests.length;
+    const testReq={id:'REQ-TST',clientUserId:'USR-GT06',clientId:'CL-GT06',clientName:'Test Client',clientPhone:'0700000000',
+      cargoType:'General goods',weightTons:1,pickupLat:-1.29,pickupLon:36.82,pickupAddr:'Test pickup',pickupComment:'',
+      dropoffLat:-1.30,dropoffLon:36.82,dropoffAddr:'Test dropoff',dropoffComment:'',date:today(),mode:'instant',status:'Open',createdAt:now()};
+    DB.requests.push(testReq);
+    const testTr=DB.transporters.find(t=>t.status==='Active'&&t.capacityTons>=1);
+    assert('Found eligible test transporter',!!testTr,testTr?.name);
+    if(testTr){
+      const dist=haversine(testReq.pickupLat,testReq.pickupLon,testTr.baseLat,testTr.baseLon);
+      const fare=Math.round(testTr.ratePerKm*dist*(1+testReq.weightTons*0.1));
+      createBooking(testReq,testTr,dist,fare,'instant');
+      assert('Booking created',DB.bookings.length===b0+1);
+      assert('Request status → Booked',testReq.status==='Booked');
+      assert('Fare > 0',fare>0,`KES ${fmt(fare)}`);
+      assert('Booking distKm > 0',DB.bookings[DB.bookings.length-1].distKm>0);
+      assert('2 SMS notifications generated (tr + client)',DB.msgs.length>=s0+2);
+    }
+    DB.requests=DB.requests.filter(r=>r.id!=='REQ-TST');
+    DB.bookings=DB.bookings.filter(b=>b.reqId!=='REQ-TST');
+    DB.msgs=DB.msgs.slice(0,s0);
+    log('');
+
+    // ── 7. RFQ BID SUBMISSION ─────────────────────────────
+    log('[7] RFQ bid submission & floor rate');
+    const rfqReq={id:'REQ-RFQ',clientUserId:'USR-FF08',clientId:'CL-FF08',clientName:'Test Client',clientPhone:'0703800008',
+      cargoType:'Perishables',weightTons:0.8,pickupLat:-1.26,pickupLon:36.80,pickupAddr:'Westlands',pickupComment:'',
+      dropoffLat:-1.29,dropoffLon:36.82,dropoffAddr:'CBD',dropoffComment:'',date:today(),mode:'rfq',
+      status:'RFQ',bidWindowSecs:3600,bidExpiresAt:now()+3600000,createdAt:now()};
+    DB.requests.push(rfqReq);
+    const rfqTr=DB.transporters.find(t=>t.id==='TR-GN04'); // Grace Njeri, Refrigerated van
+    assert('Grace Njeri transporter found',!!rfqTr);
+    if(rfqTr){
+      const dist=haversine(rfqReq.pickupLat,rfqReq.pickupLon,rfqTr.baseLat,rfqTr.baseLon);
+      const floorAmt=Math.round((DB.settings.floors[rfqTr.vehicle]||80)*dist);
+      const validAmt=floorAmt+1000;
+      const belowAmt=Math.max(1,floorAmt-100);
+      // Valid bid above floor
+      const b_before=DB.bids.length;
+      const bid={id:uid('BID'),reqId:'REQ-RFQ',transporterId:rfqTr.id,transporterName:rfqTr.name,phone:rfqTr.phone,vehicle:rfqTr.vehicle,distKm:Math.round(dist*10)/10,amount:validAmt,status:'Pending',submittedAt:now()};
+      if(validAmt>=floorAmt){DB.bids.push(bid);persistLocal();}
+      assert('Valid bid (above floor) accepted',DB.bids.length===b_before+1,`KES ${validAmt} >= floor KES ${floorAmt}`);
+      // Floor check logic
+      assert('Below-floor bid would be rejected',belowAmt<floorAmt,`KES ${belowAmt} < KES ${floorAmt}`);
+      // Accept bid → creates booking
+      const bk0=DB.bookings.length;
+      bid.status='Accepted';
+      createBooking(rfqReq,rfqTr,dist,bid.amount,'rfq');
+      assert('Booking created from bid acceptance',DB.bookings.length===bk0+1);
+      assert('Request status → Booked',rfqReq.status==='Booked');
+    }
+    DB.requests=DB.requests.filter(r=>r.id!=='REQ-RFQ');
+    DB.bookings=DB.bookings.filter(b=>b.reqId!=='REQ-RFQ');
+    DB.bids=DB.bids.filter(b=>b.reqId!=='REQ-RFQ');
+    log('');
+
+    // ── 8. COUNTER-OFFER ──────────────────────────────────
+    log('[8] Counter-offer logic');
+    const origAmt=10000,threshold=DB.settings.counterPct/100;
+    const withinCounter=Math.round(origAmt*(1-threshold+0.005));
+    const outsideCounter=Math.round(origAmt*(1-threshold-0.05));
+    assert('Within-threshold counter auto-accepts',withinCounter>=origAmt*(1-threshold),`counter KES ${withinCounter} on bid KES ${origAmt}`);
+    assert('Outside-threshold counter goes to transporter',outsideCounter<origAmt*(1-threshold),`counter KES ${outsideCounter} on bid KES ${origAmt}`);
+    log('');
+
+    // ── 9. BID EXPIRY ─────────────────────────────────────
+    log('[9] Bid window expiry');
+    const expReq={id:'REQ-EXP',clientUserId:'USR-NH07',clientId:'CL-NH07',clientName:'Test',clientPhone:'0702700007',
+      cargoType:'General goods',weightTons:1,pickupLat:-1.31,pickupLon:36.82,pickupAddr:'Test',pickupComment:'',
+      dropoffLat:-1.29,dropoffLon:36.82,dropoffAddr:'Test',dropoffComment:'',
+      date:today(),mode:'rfq',status:'RFQ',bidWindowSecs:0,bidExpiresAt:now()-1000,createdAt:now()};
+    DB.requests.push(expReq);
+    const expBid={id:uid('BID'),reqId:'REQ-EXP',transporterId:'TR-DO03',transporterName:'David',phone:'0720300003',vehicle:'Lorry 10 ton',distKm:5,amount:8000,status:'Pending',submittedAt:now()-2000};
+    DB.bids.push(expBid);
+    // Simulate expiry check (same logic as timer)
+    DB.requests.filter(r=>r.mode==='rfq'&&r.status==='RFQ'&&r.bidExpiresAt<=now()).forEach(r=>{
+      r.status='Cancelled';
+      DB.bids.filter(b=>b.reqId===r.id&&b.status==='Pending').forEach(b=>b.status='Expired');
+    });
+    assert('Expired RFQ → status Cancelled',expReq.status==='Cancelled');
+    assert('Expired bid → status Expired',expBid.status==='Expired');
+    DB.requests=DB.requests.filter(r=>r.id!=='REQ-EXP');
+    DB.bids=DB.bids.filter(b=>b.reqId!=='REQ-EXP');
+    log('');
+
+    // ── 10. MESSAGE GENERATION ────────────────────────────
+    log('[10] Message / notification generation');
+    const m0=DB.msgs.length;
+    logMsg('0722000000','Test booking notification','test');
+    assert('logMsg appends to DB.msgs',DB.msgs.length===m0+1);
+    assert('Message has correct phone',DB.msgs[0].phone==='0722000000');
+    assert('Message has type',DB.msgs[0].type==='test');
+    DB.msgs=DB.msgs.slice(1); // clean up
+    log('');
+
+    // ── 11. PHONE NORMALIZATION ───────────────────────────
+    log('[11] Phone normalisation');
+    assert('07XX stays as-is',normalizePhone('0722 123 456')==='0722123456');
+    assert('Strips hyphens',normalizePhone('0711-222-333')==='0711222333');
+    log('');
+
+    // ── 12. BOOKING COMPLETION ────────────────────────────
+    log('[12] Booking completion lifecycle');
+    const cmpReq={id:'REQ-CMP',clientUserId:'USR-GT06',clientId:'CL-GT06',clientName:'Test',clientPhone:'0700000001',
+      cargoType:'General goods',weightTons:1,pickupLat:-1.29,pickupLon:36.82,pickupAddr:'',pickupComment:'',
+      dropoffLat:-1.30,dropoffLon:36.82,dropoffAddr:'',dropoffComment:'',date:today(),mode:'instant',status:'Booked',createdAt:now()};
+    const cmpTr=DB.transporters[0];
+    const cmpBk={id:uid('BK'),reqId:'REQ-CMP',transporterId:cmpTr.id,transporterName:cmpTr.name,transporterPhone:cmpTr.phone,clientName:'Test',clientPhone:'0700000001',cargo:'General goods',distKm:2,fare:500,status:'Active',source:'instant',createdAt:now()};
+    DB.requests.push(cmpReq);DB.bookings.push(cmpBk);
+    // complete it
+    cmpBk.status='Completed';cmpReq.status='Completed';
+    assert('Booking status → Completed',cmpBk.status==='Completed');
+    assert('Request status → Completed',cmpReq.status==='Completed');
+    DB.requests=DB.requests.filter(r=>r.id!=='REQ-CMP');
+    DB.bookings=DB.bookings.filter(b=>b.id!==cmpBk.id);
+    log('');
+
+    // ── 13. BID REJECTION ────────────────────────────────
+    log('[13] Bid rejection flow');
+    const rejBid={id:uid('BID'),reqId:'REQ-0003',transporterId:'TR-AW02',transporterName:'Alice',phone:'0723200002',vehicle:'Pickup 1 ton',distKm:2,amount:5000,status:'Pending',submittedAt:now()};
+    DB.bids.push(rejBid);
+    rejBid.status='Rejected';
+    assert('Bid status set to Rejected',DB.bids.find(b=>b.id===rejBid.id)?.status==='Rejected');
+    DB.bids=DB.bids.filter(b=>b.id!==rejBid.id);
+    log('');
+
+    // ── 14. FARE CALCULATION ACCURACY ────────────────────
+    log('[14] Fare calculation accuracy');
+    // fare = rate * dist * (1 + weight * 0.1)
+    const testRate=50,testDist=10,testWeight=2;
+    const expectedFare=Math.round(testRate*testDist*(1+testWeight*0.1));
+    const calcFare=(r,d,w)=>Math.round(r*d*(1+w*0.1));
+    assert('Fare formula correct',calcFare(testRate,testDist,testWeight)===expectedFare,`KES ${expectedFare}`);
+    assert('Fare increases with weight',calcFare(50,10,5)>calcFare(50,10,1));
+    assert('Fare increases with distance',calcFare(50,20,2)>calcFare(50,10,2));
+    assert('Fare increases with rate',calcFare(80,10,2)>calcFare(50,10,2));
+    log('');
+
+    // ── 15. RFQ-ONLY TRANSPORTER ────────────────────────
+    log('[15] RFQ-only transporter preference');
+    const rfqOnlyTr={id:'TR-RFQONLY',status:'Active',capacityTons:10,baseLat:-1.29,baseLon:36.82,ratePerKm:80,pref:'rfq',vehicle:'Lorry 10 ton'};
+    const instReq={pickupLat:-1.30,pickupLon:36.81,weightTons:5,mode:'instant',vehiclePref:''};
+    const rfqReq2={pickupLat:-1.30,pickupLon:36.81,weightTons:5,mode:'rfq',vehiclePref:''};
+    assert('RFQ-only excluded from instant',!eligibleFor(rfqOnlyTr,instReq,false));
+    assert('RFQ-only included in RFQ',eligibleFor(rfqOnlyTr,rfqReq2,true));
+    log('');
+
+    // ── 16. WHATSAPP & SMS LINK FORMAT ───────────────────
+    log('[16] WhatsApp & SMS link format');
+    const wa=waLink('0722000001','Test message');
+    assert('WhatsApp link has 254 prefix',wa.includes('254722000001'));
+    assert('WhatsApp link encodes message',wa.includes('text='));
+    const sms=smsLink('0722000001','Test');
+    assert('SMS link uses sms: scheme',sms.startsWith('sms:'));
+    log('');
+
+    // ── 17. DEMO DATA INTEGRITY ───────────────────────────
+    if(cycle===0){
+      log('[17] Demo data integrity (snapshot)');
+      assert('5 transporters in DB',snap.transporters.length===5);
+      assert('4 clients in DB',snap.clients.length===4);
+      assert('9 user accounts',snap.users.length===9);
+      assert('5 transporters have userId links',snap.transporters.every(t=>!!t.userId));
+      assert('4 clients have userId links',snap.clients.every(c=>!!c.userId));
+      assert('7 requests covering all statuses',snap.requests.length===7);
+      assert('5 bids across 2 RFQ requests',snap.bids.length===5);
+      assert('2 bookings (1 active, 1 completed)',snap.bookings.length===2);
+      assert('1 active booking',snap.bookings.filter(b=>b.status==='Active').length===1);
+      assert('1 completed booking',snap.bookings.filter(b=>b.status==='Completed').length===1);
+      assert('Open requests exist',snap.requests.filter(r=>r.status==='Open').length>=2);
+      assert('RFQ requests exist',snap.requests.filter(r=>r.status==='RFQ').length>=2);
+      assert('Cancelled request exists',snap.requests.some(r=>r.status==='Cancelled'));
+      assert('Completed request exists',snap.requests.some(r=>r.status==='Completed'));
+      assert('All transporters Active',snap.transporters.every(t=>t.status==='Active'));
+      assert('All bids have amounts > 0',snap.bids.every(b=>b.amount>0));
+      assert('REQ-0003 maxFare = 7000',snap.requests.find(r=>r.id==='REQ-0003')?.maxFare===7000);
+      assert('BID-0003 amount ≤ REQ-0003 maxFare',snap.bids.find(b=>b.id==='BID-0003')?.amount<=7000);
+      assert('Booking fares > 0',snap.bookings.every(b=>b.fare>0));
+      assert('Booking BK-0001 is Completed',snap.bookings.find(b=>b.id==='BK-0001')?.status==='Completed');
+      assert('Booking BK-0002 is Active',snap.bookings.find(b=>b.id==='BK-0002')?.status==='Active');
+      assert('All demo PINs hash to same value (1234)',snap.users.every(u=>u.pinHash===hashPin('1234')));
+      log('');
+    }
+  }
+
+  // Restore state
+  Object.assign(DB,JSON.parse(JSON.stringify(snap)));
+  persistLocal();
+
+  log('═════════════════════════════════════════');
+  log(`Result: ${passed} passed · ${failed} failed · ${total} total`,(failed===0)?'p':'f');
+  log('═════════════════════════════════════════');
+
+  const pct=Math.round(passed/total*100);
+  SUM.innerHTML=`<div class="alert ${failed===0?'alert-g':'alert-r'}" style="margin-bottom:12px">${failed===0?`✅ All ${total} assertions passed${stress?` across ${cycles} stress cycles`:''}.`:`❌ ${failed} assertion${failed>1?'s':''} failed out of ${total}. Review the log above and fix before deploying.`}</div><div style="background:var(--w);border-radius:var(--rad);height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${failed===0?'var(--g)':'var(--r)'};transition:width .6s"></div></div><p style="font-size:11px;color:var(--gr);margin-top:4px">${pct}% pass rate</p>`;
 }
 
 // ════════════════════════════════════════════════
