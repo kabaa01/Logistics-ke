@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Logistics-KE — Kenya Free Transport Marketplace</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+/* ─── TOKENS ─────────────────────────────────────────────── */
+:root{
+  --g:#0d4a1e;--g2:#1a6b30;--gl:#e8f5ec;
+  --a:#d4900a;--al:#fff8e0;--ab:#7a5200;
+  --r:#b91c1c;--rl:#fef2f2;
+  --w:#f7f6f0;--ww:#fff;--bk:#111;--gr:#555;
+  --bg:#ede9e0;--bd:#d1cfc6;--bds:#b0ada0;
+  --fm:'Barlow Condensed',sans-serif;
+  --fb:'IBM Plex Sans',sans-serif;
+  --rad:7px;--shadow:0 2px 12px rgba(0,0,0,0.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--fb);background:var(--bg);color:var(--bk);min-height:100vh}
+
+/* ─── GLOBAL ELEMENTS ─────────────────────────────────────── */
+h2{font-family:var(--fm);font-size:22px;font-weight:900;color:var(--g);border-left:5px solid var(--a);padding-left:10px;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
+h3{font-family:var(--fm);font-size:16px;font-weight:700;color:var(--g2);margin-bottom:8px}
+p{font-size:13.5px;color:var(--gr);line-height:1.6;margin-bottom:7px}
+label{font-size:12px;font-weight:600;color:#333;display:block;margin-bottom:3px}
+small{font-size:11px;color:var(--gr)}
+code{background:#f0ede6;padding:1px 5px;border-radius:3px;font-size:12px}
+
+/* ─── HEADER ─────────────────────────────────────────────── */
+.hdr{background:var(--g);color:#fff;padding:0 14px;display:flex;align-items:center;gap:12px;border-bottom:5px solid var(--a);position:sticky;top:0;z-index:600;min-height:56px;flex-wrap:wrap}
+.logo{font-family:var(--fm);font-size:30px;font-weight:900;letter-spacing:-1px;line-height:1;white-space:nowrap}
+.logo span{color:var(--a)}
+.tagline{font-size:10.5px;font-weight:500;opacity:.88;line-height:1.3}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#999;display:inline-block;margin-right:4px}
+.sync-dot.on{background:#5dcaa5}.sync-dot.off{background:#e24b4a}
+.sync-chip{font-size:11px;color:#fff;opacity:.9;display:flex;align-items:center}
+.user-pill{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.13);border-radius:20px;padding:4px 10px;font-size:11.5px;font-weight:600;color:#fff}
+.user-pill button{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:11px;font-family:var(--fb);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.user-pill button:hover{color:#fff}
+
+/* ─── TABS ────────────────────────────────────────────────── */
+.tabs{background:#181818;display:flex;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid #333}
+.tabs::-webkit-scrollbar{display:none}
+.tb{flex:none;padding:11px 15px;border:none;background:transparent;color:#aaa;font-family:var(--fm);font-size:13.5px;font-weight:700;letter-spacing:.4px;cursor:pointer;border-bottom:3px solid transparent;text-transform:uppercase;white-space:nowrap}
+.tb.active{color:var(--a);border-bottom-color:var(--a)}.tb:hover:not(.active){color:#fff}
+
+/* ─── PANELS ─────────────────────────────────────────────── */
+.panel{display:none;padding:18px 14px;max-width:1060px;margin:0 auto}.panel.active{display:block}
+
+/* ─── CARDS ──────────────────────────────────────────────── */
+.card{background:var(--ww);border:1px solid var(--bd);border-radius:var(--rad);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:12px}
+
+/* ─── FORM ───────────────────────────────────────────────── */
+input,select,textarea{width:100%;padding:8px 10px;border:1.5px solid var(--bd);border-radius:var(--rad);font-family:var(--fb);font-size:13.5px;background:#fff;color:var(--bk);transition:border-color .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(13,74,30,.09)}
+textarea{resize:vertical;min-height:56px}
+.fg{margin-bottom:12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media(max-width:580px){.row,.row3{grid-template-columns:1fr}}
+
+/* ─── BUTTONS ────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:9px 16px;border-radius:var(--rad);font-family:var(--fm);font-size:13.5px;font-weight:700;letter-spacing:.4px;cursor:pointer;border:2px solid transparent;text-transform:uppercase;text-decoration:none;white-space:nowrap;transition:all .15s}
+.btn-g{background:var(--g);color:#fff;border-color:var(--g)}.btn-g:hover{background:var(--g2)}
+.btn-a{background:var(--a);color:#fff;border-color:var(--a)}.btn-a:hover{background:#b87800}
+.btn-o{background:transparent;color:var(--g);border-color:var(--g)}.btn-o:hover{background:var(--gl)}
+.btn-r{background:var(--r);color:#fff;border-color:var(--r)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-full{width:100%;justify-content:center}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+/* ─── BADGES ─────────────────────────────────────────────── */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.bd-g{background:var(--gl);color:var(--g)}.bd-a{background:var(--al);color:var(--ab)}.bd-r{background:var(--rl);color:var(--r)}.bd-b{background:#eff6ff;color:#1d4ed8}
+
+/* ─── KPI ────────────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px;margin-bottom:16px}
+.kpi{background:var(--ww);border:1px solid var(--bd);border-radius:var(--rad);padding:12px;text-align:center}
+.kpi-val{font-family:var(--fm);font-size:26px;font-weight:900;color:var(--g)}
+.kpi-lbl{font-size:9.5px;font-weight:600;color:var(--gr);text-transform:uppercase}
+
+/* ─── TABLES ─────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;border-radius:var(--rad);border:1px solid var(--bd)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead{background:var(--g);color:#fff}
+th{padding:8px 10px;text-align:left;font-family:var(--fm);font-weight:700;font-size:12px;white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--w);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--gl)}
+
+/* ─── ALERTS ─────────────────────────────────────────────── */
+.alert{padding:10px 13px;border-radius:var(--rad);font-size:12.5px;font-weight:500;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px}
+.alert-g{background:var(--gl);border-left:4px solid var(--g);color:var(--g)}
+.alert-a{background:var(--al);border-left:4px solid var(--a);color:var(--ab)}
+.alert-r{background:var(--rl);border-left:4px solid var(--r);color:var(--r)}
+
+/* ─── TRANSPORTER CARDS ──────────────────────────────────── */
+.t-card{background:var(--ww);border:1px solid var(--bd);border-radius:var(--rad);padding:14px;margin-bottom:9px}
+.t-card.avail{border-left:4px solid var(--g)}.t-card.busy{border-left:4px solid var(--a)}
+.t-avat{width:40px;height:40px;border-radius:50%;background:var(--g);color:#fff;font-family:var(--fm);font-size:17px;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none}
+.t-meta{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+.t-info{flex:1;min-width:0}
+.t-name{font-family:var(--fm);font-size:16px;font-weight:700;color:var(--bk);margin:0 0 2px}
+.t-route{font-size:11px;color:var(--gr)}
+.t-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;border-top:1px solid var(--w);padding-top:8px}
+.t-stat{text-align:center}
+.t-stat-v{font-family:var(--fm);font-size:14px;font-weight:700;color:var(--g)}
+.t-stat-l{font-size:9px;color:var(--gr);text-transform:uppercase}
+.match-card{background:var(--gl);border:2px solid var(--g);border-radius:var(--rad);padding:13px;margin-top:11px}
+.bid-row{background:var(--w);border:1px solid var(--bd);border-radius:var(--rad);padding:10px;margin-bottom:7px}
+.bid-row.best{border-color:var(--g);background:var(--gl)}.bid-row.counter{border-color:var(--a);background:var(--al)}
+.sep{height:1px;background:var(--bd);margin:12px 0}
+.empty{text-align:center;padding:28px 14px;color:var(--gr);font-size:13px}
+.timer-chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--al);color:var(--ab)}
+.timer-chip.urgent{background:var(--rl);color:var(--r)}.timer-chip.expired{background:var(--w);color:var(--gr)}
+.section-note{font-size:11.5px;color:var(--gr);background:var(--w);border:1px dashed var(--bds);border-radius:var(--rad);padding:8px 11px;margin-bottom:12px}
+
+/* ─── AUTH SCREEN ────────────────────────────────────────── */
+#auth-screen{position:fixed;inset:0;background:var(--g);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px}
+.auth-box{background:#fff;border-radius:12px;padding:30px 26px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.25)}
+.auth-logo{font-family:var(--fm);font-size:38px;font-weight:900;color:var(--g);text-align:center;margin-bottom:4px}
+.auth-logo span{color:var(--a)}
+.auth-tagline{text-align:center;font-size:12px;color:var(--gr);margin-bottom:22px}
+.auth-tabs{display:flex;border-bottom:2px solid var(--bd);margin-bottom:18px}
+.auth-tab{flex:1;padding:8px;text-align:center;font-family:var(--fm);font-size:14px;font-weight:700;text-transform:uppercase;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;color:var(--gr)}
+.auth-tab.active{color:var(--g);border-bottom-color:var(--g)}
+.role-btns{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px}
+.role-btn{padding:13px;border:2px solid var(--bd);border-radius:var(--rad);text-align:center;cursor:pointer;transition:all .15s;background:#fff}
+.role-btn:hover,.role-btn.selected{border-color:var(--g);background:var(--gl)}
+.role-btn .rb-icon{font-size:26px;display:block;margin-bottom:5px}
+.role-btn .rb-label{font-family:var(--fm);font-size:13px;font-weight:700;color:var(--g);text-transform:uppercase}
+.auth-divider{text-align:center;font-size:11px;color:var(--gr);margin:12px 0;position:relative}
+.auth-divider::before,.auth-divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--bd)}
+.auth-divider::before{left:0}.auth-divider::after{right:0}
+.pin-row{display:flex;gap:7px;justify-content:center;margin-bottom:14px}
+.pin-row input{width:44px;height:50px;text-align:center;font-size:22px;font-weight:700;border:2px solid var(--bd);border-radius:var(--rad);padding:0;font-family:var(--fm)}
+.pin-row input:focus{border-color:var(--g)}
+.auth-note{font-size:11px;color:var(--gr);text-align:center;margin-top:10px}
+.auth-switch{font-size:12px;text-align:center;color:var(--gr);margin-top:14px}
+.auth-switch a{color:var(--g);font-weight:600;cursor:pointer;text-decoration:none}
+.auth-error{color:var(--r);font-size:12px;text-align:center;margin:8px 0;min-height:18px}
+
+/* ─── LOCATION PICKER ────────────────────────────────────── */
+.loc-picker{border:1.5px solid var(--bd);border-radius:var(--rad);background:#fff;overflow:hidden;cursor:pointer}
+.loc-picker.set{border-color:var(--g)}
+.loc-summary{display:flex;align-items:center;gap:8px;padding:8px 10px;min-height:42px}
+.loc-summary:hover{background:var(--gl)}
+.loc-text{flex:1;min-width:0}
+.loc-addr{font-size:12.5px;color:var(--bk);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc-coords{font-size:10px;color:var(--gr)}
+.loc-comment-preview{font-size:10.5px;color:var(--g2);font-style:italic;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc-edit-btn{font-family:var(--fm);font-size:11px;font-weight:700;color:var(--g);text-transform:uppercase;border:none;background:none;cursor:pointer;flex:none}
+
+/* ─── MAP MODAL ──────────────────────────────────────────── */
+.map-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:700;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:680px){.map-overlay{align-items:center}}
+.map-modal{background:#fff;width:100%;max-width:680px;border-radius:12px 12px 0 0;max-height:95dvh;display:flex;flex-direction:column;overflow:hidden}
+@media(min-width:680px){.map-modal{border-radius:12px;max-height:88vh}}
+.map-head{background:var(--g);color:#fff;padding:12px 15px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.map-title{font-family:var(--fm);font-size:17px;font-weight:900;flex:1;text-transform:uppercase}
+.map-close{background:none;border:none;color:#fff;font-size:21px;cursor:pointer;line-height:1;padding:0 3px}
+.map-search-row{padding:9px 11px;border-bottom:1px solid var(--bd);display:flex;gap:7px;flex-shrink:0;background:#fafaf8}
+.map-search-wrap{position:relative;flex:1}
+.map-search-input{flex:1;font-size:13.5px;padding:7px 10px;border:1.5px solid var(--bd);border-radius:var(--rad);font-family:var(--fb);width:100%}
+.map-search-input:focus{outline:none;border-color:var(--g)}
+.search-results{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--bd);border-top:none;border-radius:0 0 var(--rad) var(--rad);z-index:50;max-height:190px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.14)}
+.sri{padding:8px 11px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--w)}
+.sri:hover{background:var(--gl)}.sri:last-child{border-bottom:none}
+.gps-banner{background:var(--al);border-bottom:1px solid #e8d080;padding:7px 11px;font-size:12px;color:var(--ab);display:flex;align-items:center;gap:7px;flex-shrink:0}
+.gps-banner.ok{background:var(--gl);border-color:#a0d4a0;color:var(--g)}
+.gps-banner.err{background:var(--rl);border-color:#e0a0a0;color:var(--r)}
+#map-container{flex:1;min-height:240px;position:relative}
+.map-crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:400;display:flex;flex-direction:column;align-items:center}
+.map-pin-hint{background:rgba(0,0,0,.68);color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;white-space:nowrap;margin-top:2px}
+.map-details{padding:11px 13px;border-top:1px solid var(--bd);flex-shrink:0;background:#fafaf8;display:flex;flex-direction:column;gap:8px}
+.map-addr-display{font-size:13px;font-weight:500;color:var(--bk);min-height:18px;display:flex;align-items:center;gap:6px}
+.map-comment-box{font-size:13px;padding:7px 9px;border:1.5px solid var(--bd);border-radius:var(--rad);font-family:var(--fb);resize:none}
+.map-comment-box:focus{outline:none;border-color:var(--g)}
+.map-confirm-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.coord-display{font-size:10.5px;color:var(--gr);margin-left:auto}
+.setup-step{display:flex;gap:10px;margin-bottom:13px}
+.setup-num{width:24px;height:24px;border-radius:50%;background:var(--g);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-weight:900;font-size:13px;flex:none}
+
+/* ─── HERO ───────────────────────────────────────────────── */
+.hero{background:var(--g);color:#fff;border-radius:var(--rad);padding:24px 20px;margin-bottom:16px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;border:32px solid rgba(212,144,10,.18);border-radius:50%}
+.hero h1{font-family:var(--fm);font-size:32px;font-weight:900;line-height:1;margin-bottom:6px}
+.hero h1 span{color:var(--a)}.hero p{font-size:13.5px;opacity:.92;color:#fff;margin-bottom:0;max-width:460px}
+
+/* ─── TOAST ──────────────────────────────────────────────── */
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--bk);color:#fff;padding:10px 18px;border-radius:28px;font-size:13px;font-weight:600;z-index:9999;transition:transform .25s;white-space:nowrap;max-width:90vw}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.tok{background:var(--g)}#toast.terr{background:var(--r)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.icon-wa{color:#1a6b30;text-decoration:none;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:4px}
+.icon-sms{color:#1d4ed8;text-decoration:none;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:4px}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     AUTH SCREEN
+══════════════════════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">Logistics<span>-KE</span></div>
+    <div class="auth-tagline">Kenya's free transport marketplace</div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="authTab('signup')">Sign up</div>
+      <div class="auth-tab" onclick="authTab('login')">Log in</div>
+    </div>
+
+    <!-- SIGN UP -->
+    <div id="auth-signup">
+      <div class="role-btns">
+        <div class="role-btn" id="rb-transporter" onclick="selectRole('transporter')">
+          <span class="rb-icon">🚚</span><span class="rb-label">Transporter</span>
+        </div>
+        <div class="role-btn" id="rb-client" onclick="selectRole('client')">
+          <span class="rb-icon">📦</span><span class="rb-label">Client</span>
+        </div>
+      </div>
+      <div class="fg"><label>Full name / business</label><input id="su-name" placeholder="e.g. John Mwangi Transport"></div>
+      <div class="fg"><label>Phone number</label><input id="su-phone" placeholder="07XX XXX XXX" inputmode="tel"></div>
+      <div class="fg"><label>Create a 4-digit PIN</label>
+        <div class="pin-row" id="su-pin-row">
+          <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="su-p0" oninput="pinNext(this,'su-p1','',0)">
+          <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="su-p1" oninput="pinNext(this,'su-p2','su-p0',1)">
+          <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="su-p2" oninput="pinNext(this,'su-p3','su-p1',2)">
+          <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="su-p3" oninput="pinNext(this,'','su-p2',3)">
+        </div>
+        <small>Remember this PIN — you'll use it to log in from any device.</small>
+      </div>
+      <div class="auth-error" id="su-err"></div>
+      <button class="btn btn-g btn-full" onclick="signUp()">Create account</button>
+      <div class="auth-divider">or</div>
+      <button class="btn btn-o btn-full" onclick="authAdminPrompt()">🔐 Admin access</button>
+      <div class="auth-note">No email needed. Your phone + PIN is your account.</div>
+    </div>
+
+    <!-- LOG IN -->
+    <div id="auth-login" style="display:none">
+      <div class="fg"><label>Phone number</label><input id="li-phone" placeholder="07XX XXX XXX" inputmode="tel"></div>
+      <div class="fg"><label>Your PIN</label>
+        <div class="pin-row">
+          <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="li-p0" oninput="pinNext(this,'li-p1','',0)">
+          <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="li-p1" oninput="pinNext(this,'li-p2','li-p0',1)">
+          <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="li-p2" oninput="pinNext(this,'li-p3','li-p1',2)">
+          <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="li-p3" oninput="pinNext(this,'','li-p2',3)">
+        </div>
+      </div>
+      <div class="auth-error" id="li-err"></div>
+      <button class="btn btn-g btn-full" onclick="logIn()">Log in</button>
+      <div class="auth-divider">or</div>
+      <button class="btn btn-o btn-full" onclick="authAdminPrompt()">🔐 Admin access</button>
+      <div class="auth-switch">Don't have an account? <a onclick="authTab('signup')">Sign up</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MAIN APP (shown after auth)
+══════════════════════════════════════════════════════════ -->
+<div id="app" style="display:none">
+
+<div class="hdr">
+  <div>
+    <div class="logo">Logistics<span>-KE</span></div>
+    <div class="tagline">Kenya free transport marketplace · GPS · Live sync</div>
+  </div>
+  <div class="hdr-right">
+    <span class="sync-chip"><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Syncing…</span></span>
+    <div class="user-pill">
+      <span id="user-label">…</span>
+      <button onclick="logOut()">Log out</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabs" id="tabbar"></div>
+
+<!-- MAP MODAL -->
+<div class="map-overlay" id="map-overlay" style="display:none" onclick="if(event.target===this)closeMap()">
+  <div class="map-modal">
+    <div class="map-head"><span class="map-title" id="map-modal-title">📍 Set location</span><button class="map-close" onclick="closeMap()">✕</button></div>
+    <div class="map-search-row">
+      <div class="map-search-wrap">
+        <input class="map-search-input" id="map-search" placeholder="Search town, landmark, road…" autocomplete="off" oninput="onMapSearch()">
+        <div class="search-results" id="search-results" style="display:none"></div>
+      </div>
+      <button class="btn btn-o btn-sm" onclick="mapGPS()">📍 My GPS</button>
+    </div>
+    <div class="gps-banner" id="gps-banner">⏳ Detecting your location…</div>
+    <div id="map-container">
+      <div class="map-crosshair">
+        <svg width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.3 0 14c0 9.2 14 22 14 22S28 23.2 28 14C28 6.3 21.7 0 14 0z" fill="#0d4a1e"/><circle cx="14" cy="14" r="5.5" fill="#fff"/></svg>
+        <span class="map-pin-hint" id="map-pin-hint">Drag map to move pin</span>
+      </div>
+    </div>
+    <div class="map-details">
+      <div class="map-addr-display">📍 <span id="map-addr-text">Move the map to set your pin</span></div>
+      <textarea class="map-comment-box" id="map-comment" rows="2" placeholder="Landmark / directions — e.g. 'Next to Total petrol station, opposite green gate, call on arrival'"></textarea>
+      <div class="map-confirm-row">
+        <button class="btn btn-g btn-sm" onclick="confirmLocation()">✓ Confirm location</button>
+        <span class="coord-display" id="map-coord-display"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PANELS -->
+<div id="p-tr-dash" class="panel">
+  <h2>Your dashboard</h2>
+  <div id="tr-profile-view"></div>
+  <div class="sep"></div>
+  <h3>Open jobs near you</h3>
+  <p style="font-size:12px">Instant jobs are first-come; bid jobs let you name your price. Refreshes every 6 seconds.</p>
+  <div id="tr-jobs-list"></div>
+</div>
+
+<div id="p-tr-profile" class="panel">
+  <h2>My profile</h2>
+  <div id="tr-edit-form"></div>
+</div>
+
+<div id="p-cl-post" class="panel">
+  <h2>Post a service request</h2>
+  <div class="card">
+    <div class="row">
+      <div class="fg"><label>Cargo type</label><select id="cl-cargo"><option>General goods</option><option>Agricultural produce</option><option>Building materials</option><option>FMCG / retail stock</option><option>Perishables</option><option>Machinery / equipment</option><option>Livestock</option><option>Furniture</option><option>Electronics</option></select></div>
+      <div class="fg"><label>Weight (tons)</label><input id="cl-weight" type="number" step="0.1" min="0.05" placeholder="e.g. 0.5"></div>
+    </div>
+    <div class="fg">
+      <label>Pickup location <small>(tap to pin on map)</small></label>
+      <div class="loc-picker" id="lp-cl-p" onclick="openMap('cl-p','📍 Pickup location')">
+        <div class="loc-summary"><span style="font-size:16px">🟢</span><div class="loc-text"><div class="loc-addr" id="lp-cl-p-addr">Tap to set pickup on the map</div><div class="loc-coords" id="lp-cl-p-coords"></div><div class="loc-comment-preview" id="lp-cl-p-comment"></div></div><button class="loc-edit-btn" type="button">Set →</button></div>
+      </div>
+      <input type="hidden" id="cl-p-lat"><input type="hidden" id="cl-p-lon"><input type="hidden" id="cl-p-comment">
+    </div>
+    <div class="fg">
+      <label>Drop-off location <small>(tap to pin on map)</small></label>
+      <div class="loc-picker" id="lp-cl-d" onclick="openMap('cl-d','🏁 Drop-off location')">
+        <div class="loc-summary"><span style="font-size:16px">🔴</span><div class="loc-text"><div class="loc-addr" id="lp-cl-d-addr">Tap to set drop-off on the map</div><div class="loc-coords" id="lp-cl-d-coords"></div><div class="loc-comment-preview" id="lp-cl-d-comment"></div></div><button class="loc-edit-btn" type="button">Set →</button></div>
+      </div>
+      <input type="hidden" id="cl-d-lat"><input type="hidden" id="cl-d-lon"><input type="hidden" id="cl-d-comment">
+    </div>
+    <div class="fg"><label>When do you need pickup</label><input id="cl-date" type="date"></div>
+    <div class="sep"></div>
+    <h3>Booking type</h3>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:7px;font-weight:500;border:1.5px solid var(--bd);border-radius:var(--rad);padding:9px;cursor:pointer"><input type="radio" name="cl-mode" value="instant" checked style="width:auto" onchange="toggleRfqOpts(false)">⚡ Instant — auto-match nearest transporter</label>
+      <label style="display:flex;align-items:center;gap:7px;font-weight:500;border:1.5px solid var(--bd);border-radius:var(--rad);padding:9px;cursor:pointer"><input type="radio" name="cl-mode" value="rfq" style="width:auto" onchange="toggleRfqOpts(true)">🔨 Request quotes — transporters bid</label>
+    </div>
+    <div id="rfq-opts" style="display:none;margin-top:10px">
+      <div class="row3">
+        <div class="fg"><label>Bid window</label><select id="cl-window"><option value="900">15 min</option><option value="1800" selected>30 min</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select></div>
+        <div class="fg"><label>Max budget KES</label><input id="cl-maxfare" type="number" placeholder="No limit"></div>
+        <div class="fg"><label>Preferred vehicle</label><select id="cl-vpref"><option value="">Any</option><option>Motorbike (boda)</option><option>Tuk Tuk</option><option>Pickup 1 ton</option><option>Canter 3 ton</option><option>Canter 5 ton</option><option>Lorry 10 ton</option></select></div>
+      </div>
+    </div>
+    <div class="btn-row"><button class="btn btn-g" onclick="postRequest()">📤 Post request</button></div>
+  </div>
+</div>
+
+<div id="p-cl-dash" class="panel">
+  <h2>My requests</h2>
+  <div id="cl-req-list"></div>
+  <div class="sep"></div>
+  <h3>Browse transporters near you</h3>
+  <div class="fg" style="max-width:320px"><input id="cl-browse-filter" placeholder="Filter by name or vehicle" oninput="renderTransporterBrowse()"></div>
+  <div id="cl-browse-list"></div>
+</div>
+
+<div id="p-admin" class="panel">
+  <h2>🔐 Operator dashboard</h2>
+  <div class="alert alert-g" style="margin-bottom:14px">Connected to live Google Sheet · <span id="sync-detail">Syncing…</span></div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-val" id="k-tr">0</div><div class="kpi-lbl">Transporters</div></div>
+    <div class="kpi"><div class="kpi-val" id="k-cl">0</div><div class="kpi-lbl">Clients</div></div>
+    <div class="kpi"><div class="kpi-val" id="k-open">0</div><div class="kpi-lbl">Open jobs</div></div>
+    <div class="kpi"><div class="kpi-val" id="k-rfq">0</div><div class="kpi-lbl">Live bids</div></div>
+    <div class="kpi"><div class="kpi-val" id="k-bk">0</div><div class="kpi-lbl">Active bookings</div></div>
+    <div class="kpi"><div class="kpi-val" id="k-rev">0</div><div class="kpi-lbl">Booked KES</div></div>
+  </div>
+  <div class="card-grid">
+    <div class="card"><h3>Users</h3><div id="adm-users"></div></div>
+    <div class="card"><h3>Requests</h3><div id="adm-req"></div></div>
+  </div>
+  <div class="card"><h3>Booking ledger</h3><div id="adm-bk"></div></div>
+  <div class="card"><h3>Floor rates (KES/km minimum)</h3><p style="font-size:11.5px">Prevents underbidding in RFQ auctions.</p><div id="floor-form"></div><div class="btn-row"><button class="btn btn-o btn-sm" onclick="saveFloors()">Save</button></div></div>
+  <div class="card"><h3>Platform settings</h3>
+    <div class="row3">
+      <div class="fg"><label>Matching radius (km)</label><input id="set-radius" type="number" value="35"></div>
+      <div class="fg"><label>Max active jobs per transporter</label><input id="set-maxbk" type="number" value="3"></div>
+      <div class="fg"><label>Counter-offer auto-accept %</label><input id="set-counter" type="number" value="10"></div>
+    </div>
+    <div class="btn-row"><button class="btn btn-o btn-sm" onclick="saveSettings()">Save</button></div>
+  </div>
+  <div class="card"><h3>Message log</h3><div id="adm-sms"></div></div>
+  <div class="card"><h3>Danger zone</h3><button class="btn btn-r btn-sm" onclick="resetAll()">🗑 Clear ALL data</button></div>
+</div>
+
+<div id="p-github" class="panel">
+  <h2>🚀 Deploy to the Web (GitHub Pages — free)</h2>
+
+  <div class="card" style="border-left:5px solid var(--a)">
+    <h3>What this gives you</h3>
+    <p>A permanent public URL — e.g. <code>https://yourname.github.io/logistics-ke/</code> — that anyone in Kenya can open on any phone or laptop. Free, forever, no hosting fees.</p>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="card">
+    <h3>Step 1 — Create a free GitHub account</h3>
+    <ol style="padding-left:18px;font-size:13.5px;color:var(--gr);line-height:2">
+      <li>Go to <strong>github.com</strong> and click <em>Sign up</em>.</li>
+      <li>Enter any email, choose a username (e.g. <code>logistics-ke</code>), and set a password.</li>
+      <li>Verify your email address from the confirmation email GitHub sends you.</li>
+    </ol>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card">
+    <h3>Step 2 — Create a new repository</h3>
+    <ol style="padding-left:18px;font-size:13.5px;color:var(--gr);line-height:2">
+      <li>Click the <strong>+</strong> icon in the top-right of GitHub → <em>New repository</em>.</li>
+      <li>Repository name: <code>logistics-ke</code></li>
+      <li>Set visibility to <strong>Public</strong>.</li>
+      <li>Tick <em>"Add a README file"</em>.</li>
+      <li>Click <strong>Create repository</strong>.</li>
+    </ol>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card">
+    <h3>Step 3 — Upload the app file</h3>
+    <ol style="padding-left:18px;font-size:13.5px;color:var(--gr);line-height:2">
+      <li>Inside your new repository, click <strong>Add file → Upload files</strong>.</li>
+      <li>Drag and drop <strong>logistics-ke.html</strong> into the upload area (the file you downloaded from this tool).</li>
+      <li>Also upload <strong>logistics-ke-backend.gs.txt</strong> if you want to keep the backend script safe in the same repo (optional — it won't be served publicly).</li>
+      <li>In the <em>Commit changes</em> box at the bottom, write <code>Initial upload</code>.</li>
+      <li>Click <strong>Commit changes</strong>.</li>
+    </ol>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="card">
+    <h3>Step 4 — Rename the file so it loads as your homepage</h3>
+    <ol style="padding-left:18px;font-size:13.5px;color:var(--gr);line-height:2">
+      <li>In your repository, click on <strong>logistics-ke.html</strong>.</li>
+      <li>Click the pencil (✏️ Edit) icon on the right.</li>
+      <li>At the top of the editor you'll see the filename. Change <code>logistics-ke.html</code> to <code>index.html</code>.</li>
+      <li>Scroll down and click <strong>Commit changes</strong>.</li>
+    </ol>
+    <div class="alert alert-g" style="margin-top:10px">💡 Naming it <code>index.html</code> means GitHub Pages will load it automatically when someone visits your URL — no need to type the filename.</div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="card">
+    <h3>Step 5 — Turn on GitHub Pages</h3>
+    <ol style="padding-left:18px;font-size:13.5px;color:var(--gr);line-height:2">
+      <li>In your repository, click <strong>Settings</strong> (top menu, last item).</li>
+      <li>In the left sidebar, click <strong>Pages</strong>.</li>
+      <li>Under <em>Source</em>, select <strong>Deploy from a branch</strong>.</li>
+      <li>Under <em>Branch</em>, select <strong>main</strong> and leave the folder as <strong>/ (root)</strong>.</li>
+      <li>Click <strong>Save</strong>.</li>
+      <li>Wait 60–90 seconds, then refresh the Pages settings page.</li>
+      <li>You will see a green banner: <em>"Your site is live at <code>https://yourname.github.io/logistics-ke/</code>"</em></li>
+    </ol>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="card">
+    <h3>Step 6 — Share your live link</h3>
+    <p style="font-size:13.5px">Your URL looks like: <code>https://YOUR-GITHUB-USERNAME.github.io/logistics-ke/</code></p>
+    <p style="font-size:13.5px">Share this link via WhatsApp, SMS, or a QR code. Anyone who opens it on any phone gets the full app — already connected to your Google Sheet.</p>
+    <div class="alert alert-a" style="margin-top:8px">⚠ The admin passphrase is inside the HTML file. Do not share it with anyone. Only you need to enter it. To change it, edit line 420 in the file (<code>const ADMIN_SECRET=</code>) before uploading to GitHub.</div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="card">
+    <h3>Step 7 — Updating the app in future</h3>
+    <ol style="padding-left:18px;font-size:13.5px;color:var(--gr);line-height:2">
+      <li>Download the latest <code>logistics-ke.html</code> from this tool.</li>
+      <li>In your GitHub repository, click on <code>index.html</code>.</li>
+      <li>Click the pencil ✏️ icon → then click <em>Edit</em>.</li>
+      <li>Select all the text (<kbd>Ctrl+A</kbd> / <kbd>Cmd+A</kbd>) and delete it.</li>
+      <li>Open the new <code>logistics-ke.html</code> in a text editor, select all, copy, and paste into GitHub's editor.</li>
+      <li>Click <strong>Commit changes</strong>. Your live site updates in ~30 seconds.</li>
+    </ol>
+    <div class="alert alert-g" style="margin-top:8px">✓ All existing user data in your Google Sheet is untouched — updates only change the app, not the data.</div>
+  </div>
+
+  <!-- GOOGLE SHEET BACKEND -->
+  <div class="card">
+    <h3>🗂 Backend setup reminder (Google Sheet)</h3>
+    <p style="font-size:13px">Your Google Sheet URL is already wired into this app. The backend script (<code>logistics-ke-backend.gs.txt</code>) must be deployed as described below if not already done.</p>
+    <ol style="padding-left:18px;font-size:13.5px;color:var(--gr);line-height:2">
+      <li>Open <strong>sheets.google.com</strong> → create a blank sheet named <em>Logistics-KE Database</em>.</li>
+      <li>Click <strong>Extensions → Apps Script</strong>. Delete starter code, paste the full contents of <code>logistics-ke-backend.gs.txt</code>.</li>
+      <li>Click <strong>Save</strong> (name project <em>Logistics-KE API</em>).</li>
+      <li>In the function dropdown, select <code>initialSetup</code> → click <strong>▶ Run</strong>. Authorize when prompted (it's your own script — safe to allow).</li>
+      <li>Click <strong>Deploy → New deployment → Web app</strong>. Set <em>Execute as: Me</em>, <em>Who has access: Anyone</em>. Click Deploy.</li>
+      <li>The Web app URL shown is already the one wired into this app — no further action needed.</li>
+    </ol>
+  </div>
+
+  <!-- ADMIN SECRET -->
+  <div class="card" style="border-left:5px solid var(--r)">
+    <h3>🔐 Your admin passphrase</h3>
+    <p style="font-size:13.5px">On the login screen, click <strong>"🔐 Admin access"</strong> and enter the passphrase below. Keep this private — it gives full access to all data.</p>
+    <div style="background:#1a1a1a;color:#9fe1cb;padding:12px 16px;border-radius:var(--rad);font-size:18px;font-weight:700;letter-spacing:3px;margin:10px 0;font-family:monospace" id="admin-secret-display">LKADMIN2025</div>
+    <p style="font-size:12px;color:var(--gr)">To change it: open <code>logistics-ke.html</code> in any text editor, find line 420 (<code>const ADMIN_SECRET=</code>), replace the value with your new passphrase, and re-upload to GitHub.</p>
+  </div>
+</div>
+
+</div><!-- #app -->
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════
+//  CONFIG — hardcoded for this deployment
+// ════════════════════════════════════════════════
+const API_URL='https://script.google.com/macros/s/AKfycbw4pUjyUwDpeB27UOc0KGRZJCMGS4ieWOb3hhKh40J5jNw50dkIO6QCmBQsyzPCGP915Q/exec';
+// Change this secret to whatever only you know.
+// Users typing it on the login screen get admin access.
+const ADMIN_SECRET='LKADMIN2025';
+
+// ════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════
+function uid(p){return p+'-'+Date.now().toString(36)+Math.floor(Math.random()*900+100)}
+function rad(d){return d*Math.PI/180}
+function haversine(la1,lo1,la2,lo2){const R=6371,dL=rad(la2-la1),dLo=rad(lo2-lo1),a=Math.sin(dL/2)**2+Math.cos(rad(la1))*Math.cos(rad(la2))*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))}
+function fmt(n){return Math.round(n).toLocaleString('en-KE')}
+function today(){return new Date().toISOString().split('T')[0]}
+function now(){return Date.now()}
+const G=id=>document.getElementById(id);
+function sv(k,v){try{localStorage.setItem('lxke_'+k,JSON.stringify(v))}catch(e){}}
+function lv(k,d){try{const v=localStorage.getItem('lxke_'+k);return v?JSON.parse(v):d}catch(e){return d}}
+
+// ════════════════════════════════════════════════
+//  IN-MEMORY DB (synced from Sheet)
+// ════════════════════════════════════════════════
+let DB={
+  users:lv('users',[]),
+  transporters:lv('transporters',[]),
+  clients:lv('clients',[]),
+  requests:lv('requests',[]),
+  bids:lv('bids',[]),
+  bookings:lv('bookings',[]),
+  msgs:lv('msgs',[]),
+  settings:lv('settings',{radiusKm:35,maxBookings:3,counterPct:10,floors:{
+    'Motorbike (boda)':25,'Tuk Tuk':30,'Pickup 1 ton':40,'Canter 3 ton':45,
+    'Canter 5 ton':50,'Lorry 10 ton':65,'Flatbed 8 ton':60,'Refrigerated van':80,'Semi-trailer 30 ton':90
+  }})
+};
+function persistLocal(){['users','transporters','clients','requests','bids','bookings','msgs','settings'].forEach(k=>sv(k,DB[k]))}
+
+// current session (not in main DB)
+let SESSION=lv('session',null); // {userId,role,name,phone,transporterId?,clientId?}
+
+// ════════════════════════════════════════════════
+//  API
+// ════════════════════════════════════════════════
+let LAST_SYNC_OK=null;
+
+function setSyncUI(state,text){
+  const dot=G('sync-dot'),txt=G('sync-text'),det=G('sync-detail');
+  if(dot)dot.className='sync-dot '+(state==='on'?'on':state==='off'?'off':'');
+  if(txt)txt.textContent=text;
+  if(det)det.textContent=text;
+}
+
+async function apiPost(action,entity,payload){
+  try{
+    const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,entity,payload})});
+    const j=await r.json();
+    if(j&&j.ok){applyRemote(j.data);LAST_SYNC_OK=true;setSyncUI('on','Synced');return j}
+    throw new Error('bad');
+  }catch(e){LAST_SYNC_OK=false;setSyncUI('off','Sync error');return null}
+}
+
+async function apiFetch(){
+  try{
+    const r=await fetch(API_URL+'?t='+now());
+    const j=await r.json();
+    if(j&&j.ok){applyRemote(j.data);LAST_SYNC_OK=true;setSyncUI('on','Synced just now')}
+    else throw new Error();
+  }catch(e){LAST_SYNC_OK=false;setSyncUI('off','Reconnecting…')}
+}
+
+function applyRemote(data){
+  if(!data)return;
+  if(data.users)DB.users=data.users;
+  if(data.transporters)DB.transporters=data.transporters;
+  if(data.clients)DB.clients=data.clients;
+  if(data.requests)DB.requests=data.requests;
+  if(data.bids)DB.bids=data.bids;
+  if(data.bookings)DB.bookings=data.bookings;
+  if(data.messages)DB.msgs=data.messages;
+  persistLocal();
+  rerenderActive();
+}
+
+function rerenderActive(){
+  const a=document.querySelector('.panel.active');
+  if(a)refreshPanel(a.id.replace('p-',''));
+}
+
+// ════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════
+let _signupRole='transporter';
+
+function authTab(t){
+  G('auth-signup').style.display=t==='signup'?'block':'none';
+  G('auth-login').style.display=t==='login'?'block':'none';
+  document.querySelectorAll('.auth-tab').forEach((el,i)=>el.classList.toggle('active',(i===0&&t==='signup')||(i===1&&t==='login')));
+}
+
+function selectRole(r){
+  _signupRole=r;
+  document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('selected'));
+  G('rb-'+r).classList.add('selected');
+}
+
+function getPIN(prefix){return ['0','1','2','3'].map(i=>G(prefix+'-p'+i)?.value||'').join('')}
+
+function pinNext(el,nextId,prevId,idx){
+  const v=el.value.replace(/\D/g,'');
+  el.value=v;
+  if(v&&nextId)G(nextId)?.focus();
+  if(!v&&prevId)G(prevId)?.focus();
+}
+
+function hashPin(pin){
+  // Simple deterministic hash — good enough for a PIN without a backend auth server
+  let h=5381;for(let i=0;i<pin.length;i++){h=((h<<5)+h)+pin.charCodeAt(i);h=h&h}
+  return Math.abs(h).toString(36);
+}
+
+function authAdminPrompt(){
+  const secret=prompt('Enter admin passphrase:');
+  if(!secret)return;
+  if(secret.trim()===ADMIN_SECRET){
+    SESSION={userId:'admin',role:'admin',name:'Operator',phone:''};
+    sv('session',SESSION);bootApp();
+  }else{
+    alert('Incorrect passphrase.');
+  }
+}
+
+async function signUp(){
+  const name=G('su-name').value.trim(),phone=normalizePhone(G('su-phone').value.trim()),pin=getPIN('su');
+  G('su-err').textContent='';
+  if(!name){G('su-err').textContent='Enter your name.';return}
+  if(!phone){G('su-err').textContent='Enter a valid phone number.';return}
+  if(pin.length<4){G('su-err').textContent='Enter all 4 PIN digits.';return}
+  if(!_signupRole){G('su-err').textContent='Choose Transporter or Client.';return}
+  // fetch latest users first to check duplicates
+  await apiFetch();
+  const exists=DB.users.find(u=>u.phone===phone);
+  if(exists){G('su-err').textContent='This phone is already registered. Log in instead.';authTab('login');G('li-phone').value=G('su-phone').value;return}
+  const user={id:uid('USR'),name,phone,role:_signupRole,pinHash:hashPin(pin),joined:today()};
+  DB.users.push(user);persistLocal();
+  const res=await apiPost('upsert','User',user);
+  if(!res){G('su-err').textContent='Could not save — check connection and try again.';DB.users=DB.users.filter(u=>u.id!==user.id);return}
+  SESSION={userId:user.id,role:user.role,name:user.name,phone:user.phone};
+  if(_signupRole==='transporter')SESSION.transporterId=null;
+  else SESSION.clientId=null;
+  sv('session',SESSION);
+  bootApp();
+  // For transporters, take them straight to profile setup
+  if(_signupRole==='transporter')switchTab('tr-profile');
+}
+
+async function logIn(){
+  const phone=normalizePhone(G('li-phone').value.trim()),pin=getPIN('li');
+  G('li-err').textContent='';
+  if(!phone){G('li-err').textContent='Enter your phone number.';return}
+  if(pin.length<4){G('li-err').textContent='Enter your 4-digit PIN.';return}
+  G('li-err').textContent='Checking…';
+  await apiFetch();
+  const user=DB.users.find(u=>u.phone===phone);
+  if(!user){G('li-err').textContent='Phone not found. Sign up first.';return}
+  if(user.pinHash!==hashPin(pin)){G('li-err').textContent='Wrong PIN. Try again.';return}
+  G('li-err').textContent='';
+  // find linked transporter or client record
+  SESSION={userId:user.id,role:user.role,name:user.name,phone:user.phone};
+  if(user.role==='transporter'){const tr=DB.transporters.find(t=>t.userId===user.id);SESSION.transporterId=tr?.id||null}
+  else if(user.role==='client'){const cl=DB.clients.find(c=>c.userId===user.id);SESSION.clientId=cl?.id||null}
+  sv('session',SESSION);
+  bootApp();
+}
+
+function logOut(){
+  SESSION=null;sv('session',null);
+  G('app').style.display='none';
+  G('auth-screen').style.display='flex';
+  // clear pin fields
+  document.querySelectorAll('.pin-d').forEach(el=>el.value='');
+  authTab('login');
+}
+
+function normalizePhone(p){return p.replace(/[\s\-]/g,'')}
+
+function bootApp(){
+  G('auth-screen').style.display='none';
+  G('app').style.display='block';
+  G('user-label').textContent=SESSION.name+' · '+(SESSION.role==='admin'?'Operator':SESSION.role==='transporter'?'Transporter':'Client');
+  renderTabs();
+  apiFetch();
+  if(SESSION.role==='transporter')switchTab(SESSION.transporterId?'tr-dash':'tr-profile');
+  else if(SESSION.role==='client')switchTab('cl-post');
+  else switchTab('admin');
+}
+
+// ════════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════════
+const TAB_DEFS={
+  transporter:[{id:'tr-dash',l:'My jobs'},{id:'tr-profile',l:'My profile'}],
+  client:[{id:'cl-post',l:'Post request'},{id:'cl-dash',l:'My requests'}],
+  admin:[{id:'admin',l:'Dashboard'},{id:'github',l:'🚀 Deploy to web'}]
+};
+
+function renderTabs(){
+  const defs=TAB_DEFS[SESSION?.role]||[];
+  G('tabbar').innerHTML=defs.map(t=>`<button class="tb" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.l}</button>`).join('');
+}
+
+function switchTab(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
+  const p=G('p-'+id);if(p)p.classList.add('active');
+  document.querySelector(`.tb[data-tab="${id}"]`)?.classList.add('active');
+  refreshPanel(id);apiFetch();
+}
+
+function refreshPanel(id){
+  if(id==='tr-dash')renderTrDash();
+  if(id==='tr-profile')renderTrProfile();
+  if(id==='cl-dash')renderClDash();
+  if(id==='admin')renderAdmin();
+  // github panel is static, no render needed
+}
+
+// ════════════════════════════════════════════════
+//  MESSAGING
+// ════════════════════════════════════════════════
+function waLink(phone,msg){let p=String(phone).replace(/[^0-9]/g,'');if(p.startsWith('0'))p='254'+p.slice(1);if(!p.startsWith('254'))p='254'+p;return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`}
+function smsLink(phone,msg){return `sms:${phone}?body=${encodeURIComponent(msg)}`}
+function logMsg(phone,msg,type){const m={id:uid('MSG'),phone,msg,type,time:new Date().toLocaleString('en-KE')};DB.msgs.unshift(m);if(DB.msgs.length>300)DB.msgs.pop();persistLocal();apiPost('upsert','Message',m)}
+function notifyLinks(phone,msg,type){logMsg(phone,msg,type);return `<a class="icon-sms" href="${smsLink(phone,msg)}">💬 SMS</a> <a class="icon-wa" href="${waLink(phone,msg)}" target="_blank" rel="noopener">📲 WhatsApp</a>`}
+function toast(msg,type='ok'){const el=G('toast');el.className='show t'+type;el.textContent=msg;clearTimeout(window._tt);window._tt=setTimeout(()=>el.className='',2800)}
+
+// ════════════════════════════════════════════════
+//  MAP / LOCATION PICKER
+// ════════════════════════════════════════════════
+let _map=null,_mapPrefix=null,_geoTimer=null,_srTimer=null;
+
+function initLeaflet(){
+  if(_map)return;
+  _map=L.map('map-container',{zoomControl:true,attributionControl:true});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(_map);
+  _map.on('moveend',onMapMoved);
+  _map.on('move',()=>{G('map-pin-hint').textContent='Release to pin here';G('map-addr-text').textContent='Locating…';G('map-coord-display').textContent=''});
+}
+
+function onMapMoved(){
+  const c=_map.getCenter();
+  G('map-coord-display').textContent=`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+  G('map-pin-hint').textContent='Drag map to adjust';
+  clearTimeout(_geoTimer);_geoTimer=setTimeout(()=>reverseGeocode(c.lat,c.lng),600);
+}
+
+function reverseGeocode(lat,lon){
+  G('map-addr-text').textContent='Looking up address…';
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`)
+    .then(r=>r.json()).then(d=>{
+      const a=d.address||{},parts=[];
+      if(a.road||a.pedestrian)parts.push(a.road||a.pedestrian);
+      if(a.suburb||a.neighbourhood)parts.push(a.suburb||a.neighbourhood);
+      if(a.city||a.town||a.village)parts.push(a.city||a.town||a.village);
+      if(a.state)parts.push(a.state);
+      G('map-addr-text').textContent=parts.length?parts.join(', '):(d.display_name||'Unknown area');
+    }).catch(()=>G('map-addr-text').textContent='Address lookup unavailable');
+}
+
+function onMapSearch(){
+  clearTimeout(_srTimer);const q=G('map-search').value.trim();
+  if(q.length<3){G('search-results').style.display='none';return}
+  _srTimer=setTimeout(doMapSearch,500);
+}
+
+function doMapSearch(){
+  const q=G('map-search').value.trim();if(!q)return;
+  const sr=G('search-results');sr.style.display='block';sr.innerHTML='<div class="sri" style="color:var(--gr)">Searching…</div>';
+  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+', Kenya')}&format=json&limit=6&accept-language=en`)
+    .then(r=>r.json()).then(results=>{
+      if(!results.length){sr.innerHTML='<div class="sri" style="color:var(--gr)">No results</div>';return}
+      sr.innerHTML=results.map(r=>`<div class="sri" onclick="pickSR(${r.lat},${r.lon})">${r.display_name}</div>`).join('');
+    }).catch(()=>sr.innerHTML='<div class="sri" style="color:var(--r)">Search failed</div>');
+}
+
+function pickSR(lat,lon){_map.setView([lat,lon],16);G('search-results').style.display='none';G('map-search').value=''}
+
+function mapGPS(){
+  const b=G('gps-banner');b.className='gps-banner';b.textContent='⏳ Detecting GPS…';
+  if(!navigator.geolocation){b.className='gps-banner err';b.textContent='⚠ GPS not available on this browser';return}
+  navigator.geolocation.getCurrentPosition(p=>{
+    _map.setView([p.coords.latitude,p.coords.longitude],17);
+    b.className='gps-banner ok';b.textContent=`✓ GPS found — accuracy ±${Math.round(p.coords.accuracy)}m. Drag to fine-tune.`;
+  },e=>{
+    b.className='gps-banner err';b.textContent='⚠ '+({1:'Location permission denied',2:'GPS unavailable',3:'Location timed out'}[e.code]||'GPS failed — search above');
+  },{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+}
+
+function openMap(prefix,title){
+  _mapPrefix=prefix;G('map-overlay').style.display='flex';G('map-modal-title').textContent=title;
+  G('map-comment').value=G(prefix+'-comment')?.value||'';G('search-results').style.display='none';G('map-search').value='';
+  const b=G('gps-banner');b.className='gps-banner';b.textContent='⏳ Detecting your location…';
+  setTimeout(()=>{
+    initLeaflet();_map.invalidateSize();
+    const lat=parseFloat(G(prefix+'-lat')?.value),lon=parseFloat(G(prefix+'-lon')?.value);
+    if(!isNaN(lat)&&!isNaN(lon)){_map.setView([lat,lon],16);b.className='gps-banner ok';b.textContent='✓ Previous pin loaded. Drag to adjust.'}
+    else mapGPS();
+  },120);
+  document.body.style.overflow='hidden';
+}
+
+function closeMap(){G('map-overlay').style.display='none';document.body.style.overflow='';G('search-results').style.display='none'}
+
+function confirmLocation(){
+  if(!_map)return;
+  const c=_map.getCenter(),lat=c.lat,lon=c.lng,addr=G('map-addr-text').textContent,comment=G('map-comment').value.trim(),px=_mapPrefix;
+  G(px+'-lat').value=lat;G(px+'-lon').value=lon;G(px+'-comment').value=comment;
+  const addrE=G('lp-'+px+'-addr'),coordE=G('lp-'+px+'-coords'),comE=G('lp-'+px+'-comment'),picker=G('lp-'+px);
+  if(addrE)addrE.textContent=addr&&!addr.startsWith('Move')?addr:`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  if(coordE)coordE.textContent=`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  if(comE)comE.textContent=comment?'💬 '+comment:'';
+  if(picker)picker.classList.add('set');
+  closeMap();toast('Location saved ✓');
+}
+
+// ════════════════════════════════════════════════
+//  TRANSPORTER PROFILE
+// ════════════════════════════════════════════════
+function myTransporter(){return DB.transporters.find(t=>t.userId===SESSION?.userId)}
+
+function renderTrProfile(){
+  const tr=myTransporter();
+  const vOpts=['Motorbike (boda)','Tuk Tuk','Pickup 1 ton','Canter 3 ton','Canter 5 ton','Lorry 10 ton','Flatbed 8 ton','Refrigerated van','Semi-trailer 30 ton'];
+  G('tr-edit-form').innerHTML=`
+  <div class="card">
+    <h3>${tr?'Update your profile':'Complete your profile'}</h3>
+    <p style="font-size:12px">${tr?'Changes sync live to all clients.':'Add your vehicle details so clients can find you.'}</p>
+    <div class="row3">
+      <div class="fg"><label>Vehicle type</label><select id="tr-veh">${vOpts.map(v=>`<option${tr&&tr.vehicle===v?' selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="fg"><label>Capacity (tons)</label><input id="tr-cap" type="number" step="0.1" min="0.05" value="${tr?.capacityTons||''}" placeholder="e.g. 1.5"></div>
+      <div class="fg"><label>Rate (KES per km)</label><input id="tr-rate" type="number" min="1" value="${tr?.ratePerKm||''}" placeholder="e.g. 50"></div>
+    </div>
+    <div class="row">
+      <div class="fg"><label>Network for SMS</label><select id="tr-net"><option value="safaricom"${tr?.network==='safaricom'?' selected':''}>Safaricom</option><option value="airtel"${tr?.network==='airtel'?' selected':''}>Airtel Kenya</option><option value="telkom"${tr?.network==='telkom'?' selected':''}>Telkom Kenya</option></select></div>
+      <div class="fg"><label>Booking preference</label><select id="tr-pref"><option value="both"${!tr||tr.pref==='both'?' selected':''}>Instant + bid requests</option><option value="instant"${tr?.pref==='instant'?' selected':''}>Instant only</option><option value="rfq"${tr?.pref==='rfq'?' selected':''}>Bid requests only</option></select></div>
+    </div>
+    <div class="fg">
+      <label>Base location <small>(where you start — clients nearby see you)</small></label>
+      <div class="loc-picker${tr?' set':''}" id="lp-tr" onclick="openMap('tr','📍 Your base location')">
+        <div class="loc-summary"><span style="font-size:15px">📍</span><div class="loc-text"><div class="loc-addr" id="lp-tr-addr">${tr?.baseAddr||'Tap to set your base location on the map'}</div><div class="loc-coords" id="lp-tr-coords">${tr?`${tr.baseLat.toFixed(5)}, ${tr.baseLon.toFixed(5)}`:''}</div><div class="loc-comment-preview" id="lp-tr-comment">${tr?.baseComment?'💬 '+tr.baseComment:''}</div></div><button class="loc-edit-btn" type="button">Set →</button></div>
+      </div>
+      <input type="hidden" id="tr-lat" value="${tr?.baseLat||''}"><input type="hidden" id="tr-lon" value="${tr?.baseLon||''}"><input type="hidden" id="tr-comment" value="${tr?.baseComment||''}">
+    </div>
+    <div class="btn-row"><button class="btn btn-g" onclick="saveTrProfile()">✓ ${tr?'Save changes':'Save profile'}</button></div>
+  </div>`;
+}
+
+function saveTrProfile(){
+  const cap=parseFloat(G('tr-cap').value),rate=parseFloat(G('tr-rate').value);
+  const lat=parseFloat(G('tr-lat').value),lon=parseFloat(G('tr-lon').value);
+  const veh=G('tr-veh').value;
+  if(isNaN(cap)||isNaN(rate)){toast('Enter capacity and rate','err');return}
+  if(isNaN(lat)||isNaN(lon)){toast('Set base location on map first','err');return}
+  const floor=DB.settings.floors[veh]||0;
+  if(rate<floor){toast(`Rate KES ${rate}/km is below floor KES ${floor}/km for ${veh}`,'err');return}
+  const existing=myTransporter();
+  const tr={id:existing?.id||uid('TR'),userId:SESSION.userId,name:SESSION.name,phone:SESSION.phone,vehicle:veh,capacityTons:cap,ratePerKm:rate,baseLat:lat,baseLon:lon,baseAddr:G('lp-tr-addr')?.textContent||'',baseComment:G('tr-comment').value||'',network:G('tr-net').value,pref:G('tr-pref').value,status:'Active',joined:existing?.joined||today()};
+  if(existing)Object.assign(existing,tr);else DB.transporters.push(tr);
+  SESSION.transporterId=tr.id;sv('session',SESSION);
+  persistLocal();apiPost('upsert','Transporter',tr);
+  toast('Profile saved ✓');switchTab('tr-dash');
+}
+
+// ════════════════════════════════════════════════
+//  TRANSPORTER DASHBOARD
+// ════════════════════════════════════════════════
+function renderTrDash(){
+  const tr=myTransporter();
+  if(!tr){G('tr-profile-view').innerHTML='<div class="card"><div class="empty">Complete your profile first.<div class="btn-row" style="justify-content:center"><button class="btn btn-g btn-sm" onclick="switchTab(\'tr-profile\')">Set up profile</button></div></div></div>';G('tr-jobs-list').innerHTML='';return}
+  const myBk=DB.bookings.filter(b=>b.transporterId===tr.id),active=myBk.filter(b=>b.status==='Active').length;
+  G('tr-profile-view').innerHTML=`<div class="card"><div class="t-meta"><div class="t-avat">${tr.name.slice(0,2).toUpperCase()}</div><div class="t-info"><p class="t-name">${tr.name}</p><p class="t-route">${tr.vehicle} · ${tr.capacityTons}t · KES ${tr.ratePerKm}/km${tr.baseAddr?' · '+tr.baseAddr:''}</p>${tr.baseComment?`<p style="font-size:11px;color:var(--g2)">💬 ${tr.baseComment}</p>`:''}</div><span class="badge bd-g">${tr.status}</span></div><div class="t-stats"><div class="t-stat"><div class="t-stat-v">${active}/${DB.settings.maxBookings}</div><div class="t-stat-l">Active</div></div><div class="t-stat"><div class="t-stat-v">${myBk.length}</div><div class="t-stat-l">Total</div></div><div class="t-stat"><div class="t-stat-v">KES ${fmt(myBk.reduce((s,b)=>s+b.fare,0))}</div><div class="t-stat-l">Earned</div></div></div></div>`;
+  const w=G('tr-jobs-list');
+  const instant=DB.requests.filter(r=>r.mode==='instant'&&r.status==='Open'&&eligibleFor(tr,r));
+  const rfq=DB.requests.filter(r=>r.mode==='rfq'&&r.status==='RFQ'&&r.bidExpiresAt>now()&&eligibleFor(tr,r,true));
+  if(!instant.length&&!rfq.length){w.innerHTML='<div class="empty">No matching jobs right now — refreshes every 6 sec.</div>';return}
+  let h='';
+  instant.forEach(req=>{
+    const dist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon),fare=Math.round(tr.ratePerKm*dist*(1+req.weightTons*0.1));
+    h+=`<div class="t-card avail"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:5px"><strong>${req.cargoType} · ${req.weightTons}t</strong><span class="badge bd-g">Instant · KES ${fmt(fare)}</span></div><p style="font-size:12px;margin:5px 0">📦 ${req.clientName} · ${dist.toFixed(1)}km away</p><p style="font-size:12px;color:var(--g)">📍 Pickup: ${req.pickupAddr||'see coords'} ${req.pickupComment?'· 💬 '+req.pickupComment:''}</p><p style="font-size:12px;color:var(--r)">🏁 Drop-off: ${req.dropoffAddr||''} ${req.dropoffComment?'· 💬 '+req.dropoffComment:''}</p><div class="btn-row"><button class="btn btn-g btn-sm" onclick="claimInstant('${req.id}','${tr.id}')">Accept job</button></div></div>`;
+  });
+  rfq.forEach(req=>{
+    const dist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon);
+    const minBid=Math.round((DB.settings.floors[tr.vehicle]||30)*dist),sug=Math.round(tr.ratePerKm*dist*(1+req.weightTons*0.1));
+    const mine=DB.bids.find(b=>b.reqId===req.id&&b.transporterId===tr.id);
+    h+=`<div class="t-card busy"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:5px"><strong>${req.cargoType} · ${req.weightTons}t</strong><span class="timer-chip" id="ttr-${req.id}">${fmtTimer(req.bidExpiresAt)}</span></div><p style="font-size:12px;margin:5px 0">📦 ${req.clientName} · ${dist.toFixed(1)}km · Floor min KES ${fmt(minBid)}</p><p style="font-size:12px;color:var(--g)">📍 ${req.pickupAddr||''} ${req.pickupComment?'· 💬 '+req.pickupComment:''}</p><p style="font-size:12px;color:var(--r)">🏁 ${req.dropoffAddr||''} ${req.dropoffComment?'· 💬 '+req.dropoffComment:''}</p>`+
+    (mine?`<div class="alert alert-g" style="margin-top:7px">Your bid: KES ${fmt(mine.amount)} — ${mine.status}</div>`:`<div class="row" style="margin-top:8px"><input id="bid-${req.id}" type="number" min="${minBid}" value="${sug}" placeholder="KES"><button class="btn btn-a btn-sm" onclick="placeBid('${req.id}','${tr.id}')">Submit bid</button></div>`)+`</div>`;
+  });
+  w.innerHTML=h;
+}
+
+function eligibleFor(tr,req,isRfq){
+  if(tr.status!=='Active')return false;
+  if(isRfq&&tr.pref==='instant')return false;
+  if(!isRfq&&tr.pref==='rfq')return false;
+  if(tr.capacityTons<req.weightTons)return false;
+  if(haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon)>DB.settings.radiusKm)return false;
+  if(req.vehiclePref&&tr.vehicle!==req.vehiclePref)return false;
+  if(DB.bookings.filter(b=>b.transporterId===tr.id&&b.status==='Active').length>=DB.settings.maxBookings)return false;
+  return true;
+}
+
+function fmtTimer(exp){const r=Math.max(0,exp-now());if(!r)return'Closed';return `${String(Math.floor(r/60000)).padStart(2,'0')}:${String(Math.floor((r%60000)/1000)).padStart(2,'0')}`}
+
+function claimInstant(reqId,trId){
+  const req=DB.requests.find(r=>r.id===reqId),tr=DB.transporters.find(t=>t.id===trId);
+  if(!req||req.status!=='Open'){toast('Job no longer available','err');return}
+  if(!eligibleFor(tr,req)){toast('Not eligible (capacity/distance/booking limit)','err');return}
+  const dist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon);
+  createBooking(req,tr,dist,Math.round(tr.ratePerKm*dist*(1+req.weightTons*0.1)),'instant');
+  toast('Job accepted! Client notified.');renderTrDash();
+}
+
+function placeBid(reqId,trId){
+  const req=DB.requests.find(r=>r.id===reqId),tr=DB.transporters.find(t=>t.id===trId);
+  if(!req||req.status!=='RFQ'||req.bidExpiresAt<=now()){toast('Bid window closed','err');return}
+  const amt=parseFloat(G('bid-'+reqId)?.value);if(!amt||amt<=0){toast('Enter a valid bid','err');return}
+  const dist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon);
+  const minBid=Math.round((DB.settings.floors[tr.vehicle]||30)*dist);
+  if(amt<minBid){toast(`Below floor minimum KES ${fmt(minBid)}`,'err');return}
+  if(req.maxFare&&amt>req.maxFare){toast(`Exceeds client budget KES ${fmt(req.maxFare)}`,'err');return}
+  const existing=DB.bids.find(b=>b.reqId===reqId&&b.transporterId===trId&&b.status==='Pending');
+  if(existing){existing.amount=amt;apiPost('upsert','Bid',existing);persistLocal();toast('Bid updated');renderTrDash();return}
+  const bid={id:uid('BID'),reqId,transporterId:trId,transporterName:tr.name,phone:tr.phone,vehicle:tr.vehicle,distKm:Math.round(dist*10)/10,amount:amt,status:'Pending',submittedAt:now()};
+  DB.bids.push(bid);persistLocal();apiPost('upsert','Bid',bid);
+  const cl=DB.clients.find(c=>c.userId===req.clientUserId)||DB.users.find(u=>u.id===req.clientUserId);
+  if(cl)logMsg(cl.phone,`New bid on ${req.id}: ${tr.name} (${tr.vehicle}) offers KES ${fmt(amt)} · ${dist.toFixed(1)}km.`,'bid');
+  toast('Bid submitted');renderTrDash();
+}
+
+// ════════════════════════════════════════════════
+//  CLIENT
+// ════════════════════════════════════════════════
+function myClient(){return DB.clients.find(c=>c.userId===SESSION?.userId)||{userId:SESSION?.userId,name:SESSION?.name,phone:SESSION?.phone}}
+
+function toggleRfqOpts(show){G('rfq-opts').style.display=show?'block':'none'}
+
+function postRequest(){
+  const cargo=G('cl-cargo').value,weight=parseFloat(G('cl-weight').value);
+  const plat=parseFloat(G('cl-p-lat').value),plon=parseFloat(G('cl-p-lon').value);
+  const dlat=parseFloat(G('cl-d-lat').value),dlon=parseFloat(G('cl-d-lon').value);
+  if(isNaN(weight)||weight<=0){toast('Enter cargo weight','err');return}
+  if(isNaN(plat)||isNaN(plon)){toast('Set pickup location on map first','err');return}
+  if(isNaN(dlat)||isNaN(dlon)){toast('Set drop-off location on map first','err');return}
+  // ensure client record exists
+  let cl=DB.clients.find(c=>c.userId===SESSION.userId);
+  if(!cl){cl={id:uid('CL'),userId:SESSION.userId,name:SESSION.name,phone:SESSION.phone,joined:today()};DB.clients.push(cl);persistLocal();apiPost('upsert','Client',cl)}
+  const mode=document.querySelector('input[name="cl-mode"]:checked').value;
+  const req={id:uid('REQ'),clientUserId:SESSION.userId,clientId:cl.id,clientName:SESSION.name,clientPhone:SESSION.phone,cargoType:cargo,weightTons:weight,
+    pickupLat:plat,pickupLon:plon,pickupAddr:G('lp-cl-p-addr')?.textContent||'',pickupComment:G('cl-p-comment').value||'',
+    dropoffLat:dlat,dropoffLon:dlon,dropoffAddr:G('lp-cl-d-addr')?.textContent||'',dropoffComment:G('cl-d-comment').value||'',
+    date:G('cl-date').value||today(),mode,status:mode==='rfq'?'RFQ':'Open',createdAt:now()};
+  if(mode==='rfq'){
+    const win=parseInt(G('cl-window').value);req.bidWindowSecs=win;req.bidExpiresAt=now()+win*1000;
+    const mf=parseFloat(G('cl-maxfare').value);if(mf>0)req.maxFare=mf;
+    const vp=G('cl-vpref').value;if(vp)req.vehiclePref=vp;
+  }
+  DB.requests.push(req);persistLocal();apiPost('upsert','Request',req);
+  const elig=DB.transporters.filter(t=>eligibleFor(t,req,mode==='rfq'));
+  elig.forEach(t=>logMsg(t.phone,mode==='rfq'?`RFQ ${req.id}: ${cargo} ${weight}t near ${req.pickupAddr}. Bid ${Math.round(req.bidWindowSecs/60)} min window.`:`Instant job ${req.id}: ${cargo} ${weight}t near ${req.pickupAddr}. First to accept on Logistics-KE.`,'job-alert'));
+  toast(`Posted — ${elig.length} transporter(s) notified`);switchTab('cl-dash');
+}
+
+function renderClDash(){
+  const w=G('cl-req-list');
+  const reqs=DB.requests.filter(r=>r.clientUserId===SESSION.userId);
+  if(!reqs.length){w.innerHTML='<div class="empty">No requests yet. Post one to get started.</div>';renderTransporterBrowse();return}
+  const scls={Booked:'bd-g',RFQ:'bd-a',Cancelled:'bd-r',Open:'bd-b',Completed:'bd-g'};
+  let h='';
+  [...reqs].reverse().forEach(req=>{
+    const bk=DB.bookings.find(b=>b.reqId===req.id);
+    h+=`<div class="card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:7px"><div><strong>${req.id}</strong> — ${req.cargoType} · ${req.weightTons}t · <span class="badge bd-b">${req.mode==='rfq'?'RFQ':'Instant'}</span></div><span class="badge ${scls[req.status]||'bd-b'}">${req.status}</span></div>
+    <p style="font-size:12px;margin:5px 0">📍 Pickup: ${req.pickupAddr||''} ${req.pickupComment?'<br>💬 '+req.pickupComment:''}</p>
+    <p style="font-size:12px;margin-bottom:5px">🏁 Drop-off: ${req.dropoffAddr||''} ${req.dropoffComment?'<br>💬 '+req.dropoffComment:''}</p>`;
+    if(req.mode==='rfq'&&req.status==='RFQ'){
+      h+=`<p style="font-size:12px">Bid window: <span class="timer-chip" id="tcl-${req.id}">${fmtTimer(req.bidExpiresAt)}</span></p>`;
+      const bids=DB.bids.filter(b=>b.reqId===req.id&&b.status==='Pending').sort((a,b)=>a.amount-b.amount);
+      const countered=DB.bids.filter(b=>b.reqId===req.id&&b.status==='Countered');
+      if(!bids.length&&!countered.length)h+='<p style="font-size:12px;color:var(--gr)">No bids yet.</p>';
+      bids.forEach((bid,i)=>{h+=`<div class="bid-row ${i===0?'best':''}"><div style="display:flex;justify-content:space-between"><strong>${bid.transporterName}</strong><strong>KES ${fmt(bid.amount)}</strong></div><p style="font-size:11.5px;margin:3px 0">${bid.vehicle} · ${bid.distKm}km${i===0?' · Lowest bid':''}</p><div class="btn-row"><button class="btn btn-g btn-sm" onclick="acceptBid('${bid.id}')">Accept</button><input id="cnt-${bid.id}" type="number" value="${Math.round(bid.amount*.91)}" style="width:85px"><button class="btn btn-o btn-sm" onclick="counterBid('${bid.id}')">Counter</button><button class="btn btn-r btn-sm" onclick="rejectBid('${bid.id}')">Reject</button></div></div>`});
+      countered.forEach(bid=>{h+=`<div class="bid-row counter"><strong>${bid.transporterName}</strong> — counter KES ${fmt(bid.counterAmount)} sent · ${notifyLinks(bid.phone,`Reminder: please respond to counter-offer KES ${fmt(bid.counterAmount)} on ${bid.reqId}.`,'reminder')}</div>`});
+    }
+    if(bk)h+=`<div class="match-card"><strong>Booked:</strong> ${bk.transporterName} · KES ${fmt(bk.fare)} · ${bk.distKm}km<div class="btn-row">${notifyLinks(bk.transporterPhone,`Hi ${bk.transporterName}, confirming booking ${bk.id}: ${req.cargoType} ${req.weightTons}t. Pickup: ${req.pickupAddr}${req.pickupComment?' ('+req.pickupComment+')':''}. Fare KES ${fmt(bk.fare)}.`,'confirm')}${bk.status==='Active'?`<button class="btn btn-o btn-sm" onclick="completeBooking('${bk.id}')">Mark delivered</button>`:''}</div></div>`;
+    if(['Open','RFQ'].includes(req.status))h+=`<div class="btn-row"><button class="btn btn-r btn-sm" onclick="cancelRequest('${req.id}')">Cancel</button></div>`;
+    h+='</div>';
+  });
+  w.innerHTML=h;renderTransporterBrowse();
+}
+
+function acceptBid(bidId){
+  const bid=DB.bids.find(b=>b.id===bidId),req=DB.requests.find(r=>r.id===bid?.reqId),tr=DB.transporters.find(t=>t.id===bid?.transporterId);
+  if(!bid||!req||!tr)return;
+  bid.status='Accepted';apiPost('upsert','Bid',bid);
+  createBooking(req,tr,bid.distKm,bid.amount,'rfq');
+  DB.bids.filter(b=>b.reqId===req.id&&b.id!==bidId&&['Pending','Countered'].includes(b.status)).forEach(b=>{b.status='Rejected';apiPost('upsert','Bid',b);const t2=DB.transporters.find(t=>t.id===b.transporterId);if(t2)logMsg(t2.phone,`Your bid on ${req.id} was not selected.`,'bid-rejected')});
+  persistLocal();toast('Bid accepted — booking confirmed');renderClDash();
+}
+function counterBid(bidId){
+  const bid=DB.bids.find(b=>b.id===bidId);if(!bid||bid.status!=='Pending')return;
+  const amt=parseFloat(G('cnt-'+bidId)?.value);if(!amt||amt<=0){toast('Enter counter amount','err');return}
+  if(amt>=bid.amount*(1-DB.settings.counterPct/100)){bid.amount=amt;acceptBid(bidId);toast('Counter within threshold — auto-accepted');return}
+  bid.counterAmount=amt;bid.status='Countered';persistLocal();apiPost('upsert','Bid',bid);
+  logMsg(bid.phone,`Counter-offer on ${bid.reqId}: client offers KES ${fmt(amt)} (your bid KES ${fmt(bid.amount)}).`,'counter');
+  toast('Counter sent');renderClDash();
+}
+function rejectBid(bidId){const bid=DB.bids.find(b=>b.id===bidId);if(!bid)return;bid.status='Rejected';persistLocal();apiPost('upsert','Bid',bid);logMsg(bid.phone,`Your bid on ${bid.reqId} was declined.`,'bid-rejected');toast('Bid rejected');renderClDash()}
+function cancelRequest(id){const req=DB.requests.find(r=>r.id===id);if(!req)return;req.status='Cancelled';apiPost('upsert','Request',req);DB.bids.filter(b=>b.reqId===id&&b.status==='Pending').forEach(b=>{b.status='Expired';apiPost('upsert','Bid',b)});persistLocal();renderClDash()}
+function completeBooking(id){const bk=DB.bookings.find(b=>b.id===id);if(!bk)return;bk.status='Completed';apiPost('upsert','Booking',bk);const req=DB.requests.find(r=>r.id===bk.reqId);if(req){req.status='Completed';apiPost('upsert','Request',req)}persistLocal();toast('Marked delivered');renderClDash()}
+
+function renderTransporterBrowse(){
+  const w=G('cl-browse-list');if(!w)return;
+  const filt=(G('cl-browse-filter')?.value||'').toLowerCase();
+  let list=DB.transporters.filter(t=>t.status==='Active');
+  if(filt)list=list.filter(t=>t.name.toLowerCase().includes(filt)||t.vehicle.toLowerCase().includes(filt));
+  if(!list.length){w.innerHTML='<div class="empty">No transporters registered yet.</div>';return}
+  w.innerHTML=list.map(t=>{
+    const ab=DB.bookings.filter(b=>b.transporterId===t.id&&b.status==='Active').length;
+    return `<div class="t-card ${ab<DB.settings.maxBookings?'avail':'busy'}"><div class="t-meta"><div class="t-avat">${t.name.slice(0,2).toUpperCase()}</div><div class="t-info"><p class="t-name">${t.name}</p><p class="t-route">${t.vehicle} · ${t.capacityTons}t · KES ${t.ratePerKm}/km</p><p class="t-route">${t.baseAddr||''}</p>${t.baseComment?`<p style="font-size:11px;color:var(--g)">💬 ${t.baseComment}</p>`:''}</div>${ab<DB.settings.maxBookings?'<span class="badge bd-g">Available</span>':'<span class="badge bd-a">Busy</span>'}</div><div class="btn-row">${notifyLinks(t.phone,`Hi ${t.name}, I have a cargo job and found you on Logistics-KE. Are you available?`,'inquiry')}</div></div>`;
+  }).join('');
+}
+
+function createBooking(req,tr,dist,fare,source){
+  const bk={id:uid('BK'),reqId:req.id,transporterId:tr.id,transporterName:tr.name,transporterPhone:tr.phone,clientName:req.clientName,clientPhone:req.clientPhone,cargo:req.cargoType,distKm:Math.round(dist*10)/10,fare:Math.round(fare),status:'Active',source,createdAt:now()};
+  DB.bookings.push(bk);req.status='Booked';persistLocal();apiPost('upsert','Booking',bk);apiPost('upsert','Request',req);
+  const loc=`Pickup: ${req.pickupAddr||''}${req.pickupComment?' ('+req.pickupComment+')':''} → Drop-off: ${req.dropoffAddr||''}${req.dropoffComment?' ('+req.dropoffComment+')':''}`;
+  const msg=`Booking ${bk.id}: ${loc}. Cargo: ${req.cargoType} ${req.weightTons}t. Fare KES ${fmt(bk.fare)}.`;
+  logMsg(tr.phone,msg,'booking');logMsg(req.clientPhone,msg,'booking');return bk;
+}
+
+// ════════════════════════════════════════════════
+//  ADMIN
+// ════════════════════════════════════════════════
+function renderAdmin(){
+  setSyncUI(LAST_SYNC_OK===false?'off':'on',LAST_SYNC_OK===false?'Reconnecting…':'Live — synced just now');
+  G('k-tr').textContent=DB.transporters.length;G('k-cl').textContent=DB.clients.length;
+  G('k-open').textContent=DB.requests.filter(r=>r.status==='Open').length;
+  G('k-rfq').textContent=DB.requests.filter(r=>r.status==='RFQ').length;
+  G('k-bk').textContent=DB.bookings.filter(b=>b.status==='Active').length;
+  G('k-rev').textContent=fmt(DB.bookings.reduce((s,b)=>s+b.fare,0));
+  G('adm-users').innerHTML=DB.users.length?`<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Role</th><th>Joined</th></tr></thead><tbody>${DB.users.map(u=>`<tr><td>${u.name}</td><td>${u.phone}</td><td><span class="badge ${u.role==='transporter'?'bd-g':'bd-b'}">${u.role}</span></td><td>${u.joined||''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">None registered yet</div>';
+  G('adm-req').innerHTML=DB.requests.length?`<div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Client</th><th>Cargo</th><th>Pickup</th><th>Mode</th><th>Status</th></tr></thead><tbody>${[...DB.requests].reverse().map(r=>`<tr><td>${r.id}</td><td>${r.clientName}</td><td>${r.cargoType} ${r.weightTons}t</td><td>${r.pickupAddr||''}${r.pickupComment?' 💬'+r.pickupComment:''}</td><td>${r.mode}</td><td>${r.status}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">None yet</div>';
+  G('adm-bk').innerHTML=DB.bookings.length?`<div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Transporter</th><th>Client</th><th>Fare</th><th>Source</th><th>Status</th></tr></thead><tbody>${[...DB.bookings].reverse().map(b=>`<tr><td>${b.id}</td><td>${b.transporterName}</td><td>${b.clientName}</td><td>KES ${fmt(b.fare)}</td><td>${b.source}</td><td>${b.status}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">None yet</div>';
+  G('adm-sms').innerHTML=DB.msgs.length?DB.msgs.slice(0,25).map(m=>`<p style="font-size:11.5px;border-bottom:1px solid var(--w);padding:5px 0"><strong>${m.phone}</strong> [${m.type}] ${m.msg} <span style="color:var(--gr)">· ${m.time}</span></p>`).join(''):'<div class="empty">None yet</div>';
+  const ff=G('floor-form');ff.innerHTML=`<div class="row">${Object.keys(DB.settings.floors).map(v=>`<div class="fg"><label>${v}</label><input id="fl-${v.replace(/[^a-zA-Z0-9]/g,'_')}" type="number" value="${DB.settings.floors[v]}"></div>`).join('')}</div>`;
+  G('set-radius').value=DB.settings.radiusKm;G('set-maxbk').value=DB.settings.maxBookings;G('set-counter').value=DB.settings.counterPct;
+}
+function saveFloors(){Object.keys(DB.settings.floors).forEach(v=>{const el=G('fl-'+v.replace(/[^a-zA-Z0-9]/g,'_'));if(el)DB.settings.floors[v]=parseFloat(el.value)||DB.settings.floors[v]});persistLocal();toast('Floor rates saved')}
+function saveSettings(){DB.settings.radiusKm=parseFloat(G('set-radius').value)||35;DB.settings.maxBookings=parseInt(G('set-maxbk').value)||3;DB.settings.counterPct=parseFloat(G('set-counter').value)||10;persistLocal();toast('Settings saved')}
+async function resetAll(){if(!confirm('Delete ALL data from Sheet + local?'))return;await apiPost('reset',null,null);['users','transporters','clients','requests','bids','bookings','msgs'].forEach(k=>localStorage.removeItem('lxke_'+k));toast('All data cleared');renderAdmin()}
+
+// ════════════════════════════════════════════════
+//  TIMERS
+// ════════════════════════════════════════════════
+setInterval(()=>{
+  let ch=false;
+  DB.requests.filter(r=>r.mode==='rfq'&&r.status==='RFQ'&&r.bidExpiresAt<=now()).forEach(r=>{
+    r.status='Cancelled';apiPost('upsert','Request',r);
+    DB.bids.filter(b=>b.reqId===r.id&&b.status==='Pending').forEach(b=>{b.status='Expired';apiPost('upsert','Bid',b)});ch=true;
+  });
+  if(ch)persistLocal();
+  document.querySelectorAll('[id^="ttr-"],[id^="tcl-"]').forEach(el=>{
+    const id=el.id.split('-').slice(1).join('-');
+    const req=DB.requests.find(r=>r.id===id);
+    if(req&&req.bidExpiresAt){el.textContent=fmtTimer(req.bidExpiresAt);el.className='timer-chip'+(req.bidExpiresAt<=now()?' expired':req.bidExpiresAt-now()<120000?' urgent':'')}
+  });
+  const a=document.querySelector('.panel.active');
+  if(a&&ch){if(a.id==='p-tr-dash')renderTrDash();if(a.id==='p-cl-dash')renderClDash();}
+},1000);
+
+setInterval(()=>{if(SESSION)apiFetch()},6000);
+
+// ════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════
+const _ks=document.createElement('style');_ks.textContent='@keyframes spin{to{transform:rotate(360deg)}}';document.head.appendChild(_ks);
+G('cl-date').value=today();
+document.addEventListener('click',e=>{if(!e.target.closest('.map-search-wrap'))G('search-results').style.display='none'});
+selectRole('transporter'); // default selection
+if(SESSION){bootApp()}
+</script>
+</body>
+</html>
