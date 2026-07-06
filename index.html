@@ -379,6 +379,22 @@ tr:hover td{background:var(--gl)}
 
 <div id="p-admin" class="panel">
   <h2>🔐 Operator dashboard</h2>
+
+  <!-- ── EDITABLE API URL ── -->
+  <div class="card" style="border-left:5px solid var(--a)">
+    <h3>🔗 Google Sheet Web App URL</h3>
+    <p style="font-size:12.5px">This is the URL your app uses to read and write all data. Change it here if you redeploy your Apps Script or switch to a different Sheet.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div style="flex:1;min-width:220px">
+        <label>Web App URL</label>
+        <input id="adm-api-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" style="font-size:12px">
+      </div>
+      <button class="btn btn-g btn-sm" onclick="saveApiUrl()">💾 Save &amp; test</button>
+      <button class="btn btn-o btn-sm" onclick="resetApiUrl()">↩ Reset to default</button>
+    </div>
+    <div id="adm-url-status" style="margin-top:8px;font-size:12.5px"></div>
+  </div>
+
   <div class="alert alert-g" style="margin-bottom:14px">Connected to live Google Sheet · <span id="sync-detail">Syncing…</span></div>
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-val" id="k-tr">0</div><div class="kpi-lbl">Transporters</div></div>
@@ -527,9 +543,10 @@ tr:hover td{background:var(--gl)}
 // ════════════════════════════════════════════════
 //  CONFIG — hardcoded for this deployment
 // ════════════════════════════════════════════════
-const API_URL='https://script.google.com/macros/s/AKfycbw4pUjyUwDpeB27UOc0KGRZJCMGS4ieWOb3hhKh40J5jNw50dkIO6QCmBQsyzPCGP915Q/exec';
+const API_URL_DEFAULT='https://script.google.com/macros/s/AKfycbw4pUjyUwDpeB27UOc0KGRZJCMGS4ieWOb3hhKh40J5jNw50dkIO6QCmBQsyzPCGP915Q/exec';
+// Admin can change this URL from inside the app — stored in localStorage.
+let API_URL=localStorage.getItem('lxke_api_url')||API_URL_DEFAULT;
 // Change this secret to whatever only you know.
-// Users typing it on the login screen get admin access.
 const ADMIN_SECRET='LKADMIN2025';
 
 // ════════════════════════════════════════════════
@@ -1067,6 +1084,9 @@ function createBooking(req,tr,dist,fare,source){
 //  ADMIN
 // ════════════════════════════════════════════════
 function renderAdmin(){
+  // Populate the editable URL field with the current value
+  const urlInput=G('adm-api-url');
+  if(urlInput){urlInput.value=API_URL;G('adm-url-status').innerHTML='';}
   setSyncUI(LAST_SYNC_OK===false?'off':'on',LAST_SYNC_OK===false?'Reconnecting…':'Live — synced just now');
   G('k-tr').textContent=DB.transporters.length;G('k-cl').textContent=DB.clients.length;
   G('k-open').textContent=DB.requests.filter(r=>r.status==='Open').length;
@@ -1083,6 +1103,42 @@ function renderAdmin(){
 function saveFloors(){Object.keys(DB.settings.floors).forEach(v=>{const el=G('fl-'+v.replace(/[^a-zA-Z0-9]/g,'_'));if(el)DB.settings.floors[v]=parseFloat(el.value)||DB.settings.floors[v]});persistLocal();toast('Floor rates saved')}
 function saveSettings(){DB.settings.radiusKm=parseFloat(G('set-radius').value)||35;DB.settings.maxBookings=parseInt(G('set-maxbk').value)||3;DB.settings.counterPct=parseFloat(G('set-counter').value)||10;persistLocal();toast('Settings saved')}
 async function resetAll(){if(!confirm('Delete ALL data from Sheet + local?'))return;await apiPost('reset',null,null);['users','transporters','clients','requests','bids','bookings','msgs'].forEach(k=>localStorage.removeItem('lxke_'+k));toast('All data cleared');renderAdmin()}
+
+async function saveApiUrl(){
+  const input=G('adm-api-url');
+  const val=input.value.trim();
+  const status=G('adm-url-status');
+  if(!val){status.innerHTML='<span style="color:var(--r)">⚠ Enter a URL first.</span>';return}
+  if(!val.startsWith('https://script.google.com/')){status.innerHTML='<span style="color:var(--r)">⚠ URL must start with https://script.google.com/</span>';return}
+  if(!val.endsWith('/exec')){status.innerHTML='<span style="color:var(--r)">⚠ URL must end with /exec — copy it directly from the Apps Script deployment page.</span>';return}
+  status.innerHTML='<span style="color:var(--gr)">Testing connection…</span>';
+  // Update in-memory and localStorage
+  API_URL=val;
+  localStorage.setItem('lxke_api_url',val);
+  // Test it
+  try{
+    const r=await fetch(val+'?t='+now());
+    const j=await r.json();
+    if(j&&j.ok){
+      applyRemote(j.data);
+      setSyncUI('on','Synced');
+      status.innerHTML='<span style="color:var(--g)">✓ Connected and working. New URL saved.</span>';
+      toast('API URL saved ✓');
+    } else throw new Error();
+  }catch(e){
+    status.innerHTML='<span style="color:var(--r)">⚠ Could not reach that URL. Check the deployment is set to "Anyone" and try again.</span>';
+    setSyncUI('off','Connection error');
+  }
+}
+
+function resetApiUrl(){
+  API_URL=API_URL_DEFAULT;
+  localStorage.removeItem('lxke_api_url');
+  const input=G('adm-api-url');
+  if(input)input.value=API_URL_DEFAULT;
+  G('adm-url-status').innerHTML='<span style="color:var(--g)">↩ Reset to default URL.</span>';
+  toast('URL reset to default');
+}
 
 // ════════════════════════════════════════════════
 //  TIMERS
