@@ -241,9 +241,14 @@ tr:hover td{background:var(--gl)}
 .auth-divider{text-align:center;font-size:10.5px;color:var(--muted);margin:9px 0;position:relative}
 .auth-divider::before,.auth-divider::after{content:'';position:absolute;top:50%;width:44%;height:1px;background:var(--bd)}
 .auth-divider::before{left:0}.auth-divider::after{right:0}
-.pin-row{display:flex;gap:6px;justify-content:center;margin-bottom:10px}
-.pin-d{width:44px;height:48px;text-align:center;font-size:22px;font-weight:700;border:2px solid var(--bd);border-radius:var(--rad);padding:0;font-family:var(--fm);transition:border-color .12s}
+.pin-row{display:flex;gap:6px;justify-content:center;margin-bottom:6px}
+.pin-d{width:44px;height:48px;text-align:center;font-size:22px;font-weight:700;border:2px solid var(--bd);border-radius:var(--rad);padding:0;font-family:var(--fm);transition:border-color .12s;-webkit-text-security:disc;text-security:disc}
 .pin-d:focus{border-color:var(--g);outline:none}
+.pin-d.pin-err{border-color:var(--r);animation:shake .3s}
+.pin-d.pin-show{-webkit-text-security:none;text-security:none}
+@keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.pin-toggle{display:block;text-align:center;font-size:11px;color:var(--muted);cursor:pointer;margin-bottom:8px;user-select:none}
+.pin-toggle:hover{color:var(--g)}
 .auth-err{color:var(--r);font-size:12px;text-align:center;margin:5px 0;min-height:16px}
 .auth-note{font-size:10.5px;color:var(--muted);text-align:center;margin-top:7px;line-height:1.5}
 .auth-switch{font-size:12px;text-align:center;color:var(--muted);margin-top:10px}
@@ -321,16 +326,17 @@ tr:hover td{background:var(--gl)}
         <div class="fg"><label>Phone number</label><input id="su-phone" placeholder="07XX XXX XXX" inputmode="tel" autocomplete="tel"></div>
         <div class="fg">
           <label>Create a 4-digit PIN</label>
-          <div class="pin-row">
-            <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="su-p0" oninput="pinNext(this,'su-p1','',0)" onkeydown="pinKey(event,'su-p1','',0)">
-            <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="su-p1" oninput="pinNext(this,'su-p2','su-p0',1)" onkeydown="pinKey(event,'su-p2','su-p0',1)">
-            <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="su-p2" oninput="pinNext(this,'su-p3','su-p1',2)" onkeydown="pinKey(event,'su-p3','su-p1',2)">
-            <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="su-p3" oninput="pinNext(this,'','su-p2',3)" onkeydown="pinKey(event,'','su-p2',3)">
+          <div class="pin-row" id="su-pin-row">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" class="pin-d" id="su-p0" oninput="pinNext(this,'su-p1','',0)" onkeydown="pinKey(event,'su-p1','',0)" onpaste="pinPaste(event,'su')">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" class="pin-d" id="su-p1" oninput="pinNext(this,'su-p2','su-p0',1)" onkeydown="pinKey(event,'su-p2','su-p0',1)" onpaste="pinPaste(event,'su')">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" class="pin-d" id="su-p2" oninput="pinNext(this,'su-p3','su-p1',2)" onkeydown="pinKey(event,'su-p3','su-p1',2)" onpaste="pinPaste(event,'su')">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" class="pin-d" id="su-p3" oninput="pinNext(this,'','su-p2',3)" onkeydown="pinKey(event,'','su-p2',3)" onpaste="pinPaste(event,'su')">
           </div>
+          <span class="pin-toggle" id="su-pin-toggle" onclick="togglePinVisibility('su')">👁 Show PIN</span>
           <small>You'll use this PIN to log in from any device</small>
         </div>
         <div class="auth-err" id="su-err"></div>
-        <button class="btn btn-g btn-full" id="su-btn" onclick="signUp()">Create account</button>
+        <button class="btn btn-g btn-full" id="su-btn" onclick="submitAfterBlur('su')">Create account</button>
         <div class="auth-divider">or</div>
         <button class="btn btn-ghost btn-full btn-sm" onclick="authAdminPrompt()">🔐 Admin access</button>
         <div class="auth-note">No email address needed</div>
@@ -345,15 +351,16 @@ tr:hover td{background:var(--gl)}
         <div class="fg"><label>Phone number</label><input id="li-phone" placeholder="07XX XXX XXX" inputmode="tel" autocomplete="tel"></div>
         <div class="fg">
           <label>PIN</label>
-          <div class="pin-row">
-            <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="li-p0" oninput="pinNext(this,'li-p1','',0)" onkeydown="pinKey(event,'li-p1','',0)">
-            <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="li-p1" oninput="pinNext(this,'li-p2','li-p0',1)" onkeydown="pinKey(event,'li-p2','li-p0',1)">
-            <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="li-p2" oninput="pinNext(this,'li-p3','li-p1',2)" onkeydown="pinKey(event,'li-p3','li-p1',2)">
-            <input type="password" maxlength="1" inputmode="numeric" class="pin-d" id="li-p3" oninput="pinNext(this,'','li-p2',3)" onkeydown="pinKey(event,'','li-p2',3)">
+          <div class="pin-row" id="li-pin-row">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" class="pin-d" id="li-p0" oninput="pinNext(this,'li-p1','',0)" onkeydown="pinKey(event,'li-p1','',0)" onpaste="pinPaste(event,'li')">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" class="pin-d" id="li-p1" oninput="pinNext(this,'li-p2','li-p0',1)" onkeydown="pinKey(event,'li-p2','li-p0',1)" onpaste="pinPaste(event,'li')">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" class="pin-d" id="li-p2" oninput="pinNext(this,'li-p3','li-p1',2)" onkeydown="pinKey(event,'li-p3','li-p1',2)" onpaste="pinPaste(event,'li')">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" class="pin-d" id="li-p3" oninput="pinNext(this,'','li-p2',3)" onkeydown="pinKey(event,'','li-p2',3)" onpaste="pinPaste(event,'li')">
           </div>
+          <span class="pin-toggle" id="li-pin-toggle" onclick="togglePinVisibility('li')">👁 Show PIN</span>
         </div>
         <div class="auth-err" id="li-err"></div>
-        <button class="btn btn-g btn-full" id="li-btn" onclick="logIn()">Log in</button>
+        <button class="btn btn-g btn-full" id="li-btn" onclick="submitAfterBlur('li')">Log in</button>
         <div class="auth-divider">or</div>
         <button class="btn btn-ghost btn-full btn-sm" onclick="authAdminPrompt()">🔐 Admin access</button>
         <div class="auth-switch">New here? <a onclick="authTab('signup')">Create account</a></div>
@@ -724,6 +731,7 @@ function authTab(t){
   G('auth-login').style.display=t==='login'?'block':'none';
   G('at-signup').classList.toggle('active',t==='signup');
   G('at-login').classList.toggle('active',t==='login');
+  ['su','li'].forEach(pfx=>[0,1,2,3].forEach(i=>G(pfx+'-p'+i)?.classList.remove('pin-err')));
 }
 
 function selectRole(r){
@@ -732,17 +740,60 @@ function selectRole(r){
   G('rb-'+r).classList.add('selected');
 }
 
-function getPIN(pfx){return ['0','1','2','3'].map(i=>G(pfx+'-p'+i)?.value||'').join('')}
+function getPIN(pfx){return ['0','1','2','3'].map(i=>(G(pfx+'-p'+i)?.value||'').replace(/\D/g,'')).join('')}
 
 function pinNext(el,nextId,prevId,idx){
-  el.value=el.value.replace(/\D/g,'');
+  el.value=el.value.replace(/\D/g,'').slice(0,1);
+  el.classList.remove('pin-err');
   if(el.value&&nextId)G(nextId)?.focus();
   if(!el.value&&prevId)G(prevId)?.focus();
 }
 
 function pinKey(e,nextId,prevId,idx){
   if(e.key==='Backspace'&&!e.target.value&&prevId){e.preventDefault();G(prevId)?.focus()}
-  if(e.key==='Enter'){const pfx=e.target.id.startsWith('su')?'su':'li';pfx==='su'?signUp():logIn()}
+  if(e.key==='Enter'){e.preventDefault();const pfx=e.target.id.startsWith('su')?'su':'li';submitAfterBlur(pfx)}
+}
+
+// Handles pasting a full PIN (e.g. from a notes app or password manager) into any box —
+// distributes the digits across all 4 fields instead of failing silently.
+function pinPaste(e,pfx){
+  e.preventDefault();
+  const text=(e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'');
+  if(!text)return;
+  const digits=text.slice(0,4).split('');
+  digits.forEach((d,i)=>{const box=G(pfx+'-p'+i);if(box){box.value=d;box.classList.remove('pin-err')}});
+  const lastIdx=Math.min(digits.length,4)-1;
+  const nextEmpty=G(pfx+'-p'+Math.min(lastIdx+1,3));
+  if(nextEmpty)nextEmpty.focus();
+}
+
+function togglePinVisibility(pfx){
+  const boxes=[0,1,2,3].map(i=>G(pfx+'-p'+i));
+  const showing=boxes[0]?.classList.contains('pin-show');
+  boxes.forEach(b=>b?.classList.toggle('pin-show',!showing));
+  const t=G(pfx+'-pin-toggle');if(t)t.textContent=showing?'👁 Show PIN':'🙈 Hide PIN';
+}
+
+// Highlights which PIN boxes are empty so the user can see exactly what's missing,
+// instead of a vague "enter all 4 digits" message with no visual pointer.
+function markEmptyPinBoxes(pfx){
+  [0,1,2,3].forEach(i=>{
+    const box=G(pfx+'-p'+i);
+    if(box&&!box.value)box.classList.add('pin-err');
+  });
+}
+
+// Mobile keyboards (especially MIUI/Android Chrome autofill) can leave a box showing
+// a masked character visually while its real DOM value lags behind by one tick.
+// Blurring the active field and waiting a frame forces that value to commit before
+// we read it, then we re-focus so the user isn't dropped out of the form.
+function submitAfterBlur(pfx){
+  const active=document.activeElement;
+  const wasBox=active&&active.classList&&active.classList.contains('pin-d');
+  if(active&&active.blur)active.blur();
+  requestAnimationFrame(()=>{
+    if(pfx==='su')signUp();else logIn();
+  });
 }
 
 function btnLoad(id,on){const el=G(id);if(!el)return;el.disabled=on;if(on)el.classList.add('btn-loading');else el.classList.remove('btn-loading')}
@@ -759,7 +810,8 @@ async function signUp(){
   const errEl=G('su-err');errEl.textContent='';
   if(!name){errEl.textContent='Enter your name';return}
   if(phone.length<10){errEl.textContent='Enter a valid 10-digit phone number';return}
-  if(pin.length<4||pin.includes('')){errEl.textContent='Enter all 4 PIN digits';return}
+  if(pin.length<4||pin.includes('')){errEl.textContent='Enter all 4 PIN digits';markEmptyPinBoxes('su');return}
+  if(!_role){errEl.textContent='Choose Transporter or Client above';return}
   btnLoad('su-btn',true);
   await apiFetch();
   if(DB.users.find(u=>u.phone===phone)){
@@ -782,12 +834,12 @@ async function logIn(){
   const phone=normalizePhone(G('li-phone').value),pin=getPIN('li');
   const errEl=G('li-err');errEl.textContent='';
   if(!phone){errEl.textContent='Enter your phone number';return}
-  if(pin.length<4){errEl.textContent='Enter your 4-digit PIN';return}
+  if(pin.length<4){errEl.textContent='Enter your 4-digit PIN';markEmptyPinBoxes('li');return}
   btnLoad('li-btn',true);errEl.textContent='Checking…';
   await apiFetch();
   const user=DB.users.find(u=>u.phone===phone);
   if(!user){errEl.textContent='Number not found — sign up first';btnLoad('li-btn',false);return}
-  if(user.pinHash!==hashPin(pin)){errEl.textContent='Wrong PIN';btnLoad('li-btn',false);return}
+  if(user.pinHash!==hashPin(pin)){errEl.textContent='Wrong PIN';[0,1,2,3].forEach(i=>G('li-p'+i)?.classList.add('pin-err'));btnLoad('li-btn',false);return}
   errEl.textContent='';
   const tr=DB.transporters.find(t=>t.userId===user.id);
   const cl=DB.clients.find(c=>c.userId===user.id);
@@ -1559,7 +1611,7 @@ function demoLogin(phone){
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   QA TEST SUITE — 19 groups, 71 assertions
+   QA TEST SUITE — 20 groups, 77 assertions
 ═══════════════════════════════════════════════════════════════════ */
 function runQA(stress=false){
   const LOG=G('qa-log'),SUM=G('qa-summary');LOG.innerHTML='';SUM.innerHTML='';
@@ -1736,14 +1788,31 @@ function runQA(stress=false){
     assert('WhatsApp message encoded',wa.includes('text='));
     assert('SMS uses sms: scheme',smsLink('0722000001','Test').startsWith('sms:'));log('');
 
-    // [16] RFQ-only transporter pref
-    log('[16] RFQ-only preference');
+    // [16] PIN input robustness (real DOM — regression test for mobile autofill bug)
+    log('[16] PIN input robustness');
+    ['su-p0','su-p1','su-p2','su-p3'].forEach(id=>{const el=G(id);if(el)el.value=''});
+    assert('PIN boxes are type=text (not password) — avoids mobile password-manager interference',G('su-p0')?.type==='text');
+    assert('PIN boxes have autocomplete off',G('su-p0')?.getAttribute('autocomplete')==='off');
+    G('su-p0').value='1';G('su-p1').value='2';G('su-p2').value='3';G('su-p3').value='4';
+    assert('getPIN reads 4 correctly-entered digits',getPIN('su')==='1234');
+    G('su-p0').value='1';G('su-p1').value='2';G('su-p2').value='x';G('su-p3').value='4'; // simulate a stray non-digit reaching the DOM directly
+    assert('getPIN strips a stray non-digit character',getPIN('su')==='124',`got "${getPIN('su')}"`);
+    assert('Stripped result correctly reads as incomplete (3 digits, not 4)',getPIN('su').length===3);
+    G('su-p0').value='';G('su-p1').value='';G('su-p2').value='';G('su-p3').value='';
+    markEmptyPinBoxes('su');
+    assert('markEmptyPinBoxes flags all empty boxes',[0,1,2,3].every(i=>G('su-p'+i)?.classList.contains('pin-err')));
+    [0,1,2,3].forEach(i=>G('su-p'+i)?.classList.remove('pin-err'));
+    assert('pin-err class clears correctly',[0,1,2,3].every(i=>!G('su-p'+i)?.classList.contains('pin-err')));
+    log('');
+
+    // [17] RFQ-only transporter pref
+    log('[17] RFQ-only preference');
     const rfqTr={id:'TR-RFQONLY',status:'Active',capacityTons:10,baseLat:-1.29,baseLon:36.82,ratePerKm:80,pref:'rfq',vehicle:'Lorry 10 ton'};
     assert('RFQ-only excluded from instant',!eligibleFor(rfqTr,{pickupLat:-1.30,pickupLon:36.81,weightTons:5,mode:'instant',vehiclePref:''},false));
     assert('RFQ-only eligible for RFQ',eligibleFor(rfqTr,{pickupLat:-1.30,pickupLon:36.81,weightTons:5,mode:'rfq',vehiclePref:''},true));log('');
 
     // [17] PIN reset (admin safety net)
-    log('[17] Admin PIN reset');
+    log('[18] Admin PIN reset');
     const puUser={id:'USR-PINTEST',name:'Pin Test',phone:'0799999999',role:'client',pinHash:hashPin('9999'),joined:today()};
     DB.users.push(puUser);
     const oldHash=puUser.pinHash;
@@ -1752,16 +1821,16 @@ function runQA(stress=false){
     assert('Reset PIN matches 1234',puUser.pinHash===hashPin('1234'));
     DB.users=DB.users.filter(u=>u.id!=='USR-PINTEST');log('');
 
-    // [18] Vehicle list parity (client preference vs transporter registration)
-    log('[18] Vehicle list parity');
+    // [19] Vehicle list parity (client preference vs transporter registration)
+    log('[19] Vehicle list parity');
     const trVehicles=['Motorbike (boda)','Tuk Tuk','Pickup 1 ton','Canter 3 ton','Canter 5 ton','Lorry 10 ton','Flatbed 8 ton','Refrigerated van','Semi-trailer 30 ton'];
     const clVprefOptions=Array.from(document.querySelectorAll('#cl-vpref option')).map(o=>o.textContent).filter(t=>t!=='Any');
     assert('Client vehicle-preference list matches transporter registration list',trVehicles.every(v=>clVprefOptions.includes(v)),`${clVprefOptions.length}/${trVehicles.length} vehicles available`);
     assert('All floor rates cover every vehicle type',trVehicles.every(v=>DB.settings.floors[v]!==undefined));log('');
 
-    // [19] Demo data integrity (snapshot, cycle 0 only)
+    // [20] Demo data integrity (snapshot, cycle 0 only)
     if(cy===0){
-      log('[19] Demo data integrity');
+      log('[20] Demo data integrity');
       assert('9 user accounts',snap.users.length===9);
       assert('5 transporters',snap.transporters.length===5);
       assert('4 clients',snap.clients.length===4);
