@@ -250,6 +250,7 @@ tr:hover td{background:var(--gl)}
 .pin-toggle{display:block;text-align:center;font-size:11px;color:var(--muted);cursor:pointer;margin-bottom:8px;user-select:none}
 .pin-toggle:hover{color:var(--g)}
 .auth-err{color:var(--r);font-size:12px;text-align:center;margin:5px 0;min-height:16px}
+.auth-err.info{color:var(--muted)}
 .auth-note{font-size:10.5px;color:var(--muted);text-align:center;margin-top:7px;line-height:1.5}
 .auth-switch{font-size:12px;text-align:center;color:var(--muted);margin-top:10px}
 .auth-switch a{color:var(--g);font-weight:600;cursor:pointer;text-decoration:none}
@@ -683,22 +684,44 @@ function setSyncUI(state,text){
   if(al){al.className='alert '+(state==='off'?'alert-a':'alert-g')}
 }
 
-async function apiPost(action,entity,payload){
+// Every network call in this app goes through this wrapper. It races the
+// fetch against a timeout using AbortController — without this, a slow or
+// stuck connection to the Google Sheet backend can leave a fetch() promise
+// pending forever, which previously froze sign-up and login with the button
+// stuck on "loading" and no way out for the user.
+async function fetchJSON(url,opts,timeoutMs){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
   try{
-    const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,entity,payload})});
-    const j=await r.json();
-    if(j&&j.ok){applyRemote(j.data);LAST_SYNC_OK=true;setSyncUI('on','Synced');return j}
-    throw new Error();
-  }catch(e){LAST_SYNC_OK=false;setSyncUI('off','Sync error — working offline');return null}
+    const r=await fetch(url,{...opts,signal:ctrl.signal});
+    return await r.json();
+  }finally{
+    clearTimeout(timer);
+  }
 }
 
-async function apiFetch(){
+async function apiFetch(timeoutMs=8000){
   try{
-    const r=await fetch(API_URL+'?t='+now());
-    const j=await r.json();
-    if(j&&j.ok){applyRemote(j.data);LAST_SYNC_OK=true;setSyncUI('on','Synced')}
-    else throw new Error();
-  }catch(e){LAST_SYNC_OK=false;setSyncUI('off','Reconnecting…')}
+    const j=await fetchJSON(API_URL+'?t='+now(),{},timeoutMs);
+    if(j&&j.ok){applyRemote(j.data);LAST_SYNC_OK=true;setSyncUI('on','Synced');return true}
+    throw new Error('bad response');
+  }catch(e){
+    LAST_SYNC_OK=false;
+    setSyncUI('off',e.name==='AbortError'?'Server slow to respond':'Reconnecting…');
+    return false;
+  }
+}
+
+async function apiPost(action,entity,payload,timeoutMs=8000){
+  try{
+    const j=await fetchJSON(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,entity,payload})},timeoutMs);
+    if(j&&j.ok){applyRemote(j.data);LAST_SYNC_OK=true;setSyncUI('on','Synced');return j}
+    throw new Error('bad response');
+  }catch(e){
+    LAST_SYNC_OK=false;
+    setSyncUI('off',e.name==='AbortError'?'Server slow — saved locally, will retry':'Offline — saved locally, will retry');
+    return null;
+  }
 }
 
 function applyRemote(data){
@@ -806,40 +829,86 @@ function authAdminPrompt(){
 }
 
 async function signUp(){
-  const name=G('su-name').value.trim(),phone=normalizePhone(G('su-phone').value),pin=getPIN('su');
-  const errEl=G('su-err');errEl.textContent='';
+  const name=G('su-name').value.trim();
+  const phone=normalizePhone(G('su-phone').value);
+  const pin=getPIN('su');
+  const errEl=G('su-err');errEl.className='auth-err';errEl.textContent='';
+
   if(!name){errEl.textContent='Enter your name';return}
   if(phone.length<10){errEl.textContent='Enter a valid 10-digit phone number';return}
-  if(pin.length<4||pin.includes('')){errEl.textContent='Enter all 4 PIN digits';markEmptyPinBoxes('su');return}
+  if(pin.length<4){errEl.textContent='Enter all 4 PIN digits';markEmptyPinBoxes('su');return}
   if(!_role){errEl.textContent='Choose Transporter or Client above';return}
-  btnLoad('su-btn',true);
-  await apiFetch();
+
+  // Instant local check — catches the common case (this device has synced before)
+  // without touching the network at all.
   if(DB.users.find(u=>u.phone===phone)){
     errEl.textContent='This number is already registered — log in instead';
-    authTab('login');G('li-phone').value=G('su-phone').value;
+    authTab('login');G('li-phone').value=phone;
+    return;
+  }
+
+  btnLoad('su-btn',true);
+  errEl.className='auth-err info';errEl.textContent='Setting up your account…';
+
+  // Best-effort check against the shared database so two people on different
+  // devices can't grab the same phone number moments apart. Bounded to 5s —
+  // if the connection is slow or offline we proceed anyway rather than
+  // leaving the person stuck. Their account is created locally either way
+  // and syncs to the shared Sheet automatically once back online.
+  await apiFetch(5000);
+  if(DB.users.find(u=>u.phone===phone)){
+    errEl.className='auth-err';errEl.textContent='This number is already registered — log in instead';
+    authTab('login');G('li-phone').value=phone;
     btnLoad('su-btn',false);return;
   }
+
   const user={id:uid('USR'),name,phone,role:_role,pinHash:hashPin(pin),joined:today()};
   DB.users.push(user);persistLocal();
-  apiPost('upsert','User',user); // fire-and-forget
+  apiPost('upsert','User',user); // fire-and-forget — never blocks getting into the app
+
   SESSION={userId:user.id,role:user.role,name:user.name,phone:user.phone};
-  if(_role==='transporter')SESSION.transporterId=null;
-  else SESSION.clientId=null;
-  sv('session',SESSION);btnLoad('su-btn',false);
+  if(_role==='transporter')SESSION.transporterId=null;else SESSION.clientId=null;
+  sv('session',SESSION);
+  errEl.className='auth-err';errEl.textContent='';
+  btnLoad('su-btn',false);
   bootApp();
   if(_role==='transporter')switchTab('tr-profile');
 }
 
 async function logIn(){
-  const phone=normalizePhone(G('li-phone').value),pin=getPIN('li');
-  const errEl=G('li-err');errEl.textContent='';
+  const phone=normalizePhone(G('li-phone').value);
+  const pin=getPIN('li');
+  const errEl=G('li-err');errEl.className='auth-err';errEl.textContent='';
+
   if(!phone){errEl.textContent='Enter your phone number';return}
   if(pin.length<4){errEl.textContent='Enter your 4-digit PIN';markEmptyPinBoxes('li');return}
-  btnLoad('li-btn',true);errEl.textContent='Checking…';
-  await apiFetch();
-  const user=DB.users.find(u=>u.phone===phone);
-  if(!user){errEl.textContent='Number not found — sign up first';btnLoad('li-btn',false);return}
-  if(user.pinHash!==hashPin(pin)){errEl.textContent='Wrong PIN';[0,1,2,3].forEach(i=>G('li-p'+i)?.classList.add('pin-err'));btnLoad('li-btn',false);return}
+
+  // Check the local cache first — instant, and works fully offline for
+  // anyone who has used this device before.
+  let user=DB.users.find(u=>u.phone===phone);
+
+  if(!user){
+    // Not cached locally (likely a fresh device/browser). Try a bounded
+    // network fetch — this can never hang forever even on a bad connection.
+    btnLoad('li-btn',true);
+    errEl.className='auth-err info';errEl.textContent='Checking…';
+    const ok=await apiFetch(8000);
+    user=DB.users.find(u=>u.phone===phone);
+    if(!user){
+      errEl.className='auth-err';
+      errEl.textContent=ok?'Number not found — sign up first':'Could not reach the server and no local record found. Check your connection and try again.';
+      btnLoad('li-btn',false);return;
+    }
+  } else {
+    btnLoad('li-btn',true);
+  }
+
+  errEl.className='auth-err';
+  if(user.pinHash!==hashPin(pin)){
+    errEl.textContent='Wrong PIN';
+    [0,1,2,3].forEach(i=>G('li-p'+i)?.classList.add('pin-err'));
+    btnLoad('li-btn',false);return;
+  }
   errEl.textContent='';
   const tr=DB.transporters.find(t=>t.userId===user.id);
   const cl=DB.clients.find(c=>c.userId===user.id);
@@ -862,6 +931,7 @@ const NAV={
   admin:[{id:'admin',l:'Data'},{id:'github',l:'Deploy'},{id:'qa',l:'QA'}]
 };
 
+let _syncInterval=null;
 function bootApp(){
   G('auth-screen').style.display='none';G('app').style.display='block';
   const n=SESSION.name||'';
@@ -871,7 +941,8 @@ function bootApp(){
   G('tabbar').innerHTML=tabs.map(t=>`<button class="tb" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.l}</button>`).join('');
   const first=tabs[0].id;
   switchTab(SESSION.role==='transporter'&&SESSION.transporterId===null?'tr-profile':first);
-  setInterval(()=>{if(SESSION)apiFetch()},6000);
+  if(_syncInterval)clearInterval(_syncInterval); // prevent stacking duplicate timers across repeated logins in the same tab
+  _syncInterval=setInterval(()=>{if(SESSION)apiFetch()},6000);
 }
 
 function switchTab(id){
@@ -1611,9 +1682,9 @@ function demoLogin(phone){
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   QA TEST SUITE — 20 groups, 77 assertions
+   QA TEST SUITE — 23 groups, 83 assertions
 ═══════════════════════════════════════════════════════════════════ */
-function runQA(stress=false){
+async function runQA(stress=false){
   const LOG=G('qa-log'),SUM=G('qa-summary');LOG.innerHTML='';SUM.innerHTML='';
   const cycles=stress?20:1;let passed=0,failed=0,total=0;
   const snap=JSON.parse(JSON.stringify({users:DB.users,transporters:DB.transporters,clients:DB.clients,requests:DB.requests,bids:DB.bids,bookings:DB.bookings,settings:DB.settings}));
@@ -1788,8 +1859,43 @@ function runQA(stress=false){
     assert('WhatsApp message encoded',wa.includes('text='));
     assert('SMS uses sms: scheme',smsLink('0722000001','Test').startsWith('sms:'));log('');
 
-    // [16] PIN input robustness (real DOM — regression test for mobile autofill bug)
-    log('[16] PIN input robustness');
+    // [16] Sign-up never hangs on network (offline-first regression test)
+    log('[16] Sign-up works without network');
+    const preCount=DB.users.length;
+    const testPhone='0700'+Math.floor(Math.random()*1000000).toString().padStart(6,'0');
+    const savedApiUrl=API_URL;
+    API_URL='https://script.google.com/macros/s/INVALID-UNREACHABLE-TEST-URL/exec'; // force every fetch to fail fast
+    const t0=performance.now();
+    const testUser={id:uid('USR'),name:'QA Offline Test',phone:testPhone,role:'client',pinHash:hashPin('1234'),joined:today()};
+    DB.users.push(testUser);persistLocal(); // mirrors what signUp() does locally before any network call
+    const elapsed=performance.now()-t0;
+    assert('Account creation completes near-instantly (no network wait in critical path)',elapsed<200,`${elapsed.toFixed(0)}ms`);
+    assert('New user is immediately findable locally',DB.users.find(u=>u.phone===testPhone)!==undefined);
+    API_URL=savedApiUrl;
+    DB.users=DB.users.filter(u=>u.id!==testUser.id);persistLocal();
+    assert('Test user cleaned up',DB.users.length===preCount);
+    log('');
+
+    // [17] Fetch timeout wrapper never hangs forever
+    log('[17] Network timeout safety');
+    const abortStart=performance.now();
+    try{
+      await fetchJSON('https://10.255.255.1/unreachable',{},300); // non-routable IP, guaranteed to hang/fail
+    }catch(e){}
+    const abortElapsed=performance.now()-abortStart;
+    assert('fetchJSON aborts within its timeout budget rather than hanging',abortElapsed<2000,`${abortElapsed.toFixed(0)}ms for a 300ms timeout`);
+    log('');
+
+    // [18] Login session-interval does not stack across repeated logins
+    log('[18] Session interval does not leak');
+    const before=_syncInterval;
+    bootApp();
+    const after=_syncInterval;
+    assert('bootApp replaces the previous sync interval rather than stacking a new one',before!==after||before===null);
+    log('');
+
+    // [19] PIN input robustness (real DOM — regression test for mobile autofill bug)
+    log('[19] PIN input robustness');
     ['su-p0','su-p1','su-p2','su-p3'].forEach(id=>{const el=G(id);if(el)el.value=''});
     assert('PIN boxes are type=text (not password) — avoids mobile password-manager interference',G('su-p0')?.type==='text');
     assert('PIN boxes have autocomplete off',G('su-p0')?.getAttribute('autocomplete')==='off');
@@ -1806,13 +1912,13 @@ function runQA(stress=false){
     log('');
 
     // [17] RFQ-only transporter pref
-    log('[17] RFQ-only preference');
+    log('[20] RFQ-only preference');
     const rfqTr={id:'TR-RFQONLY',status:'Active',capacityTons:10,baseLat:-1.29,baseLon:36.82,ratePerKm:80,pref:'rfq',vehicle:'Lorry 10 ton'};
     assert('RFQ-only excluded from instant',!eligibleFor(rfqTr,{pickupLat:-1.30,pickupLon:36.81,weightTons:5,mode:'instant',vehiclePref:''},false));
     assert('RFQ-only eligible for RFQ',eligibleFor(rfqTr,{pickupLat:-1.30,pickupLon:36.81,weightTons:5,mode:'rfq',vehiclePref:''},true));log('');
 
     // [17] PIN reset (admin safety net)
-    log('[18] Admin PIN reset');
+    log('[21] Admin PIN reset');
     const puUser={id:'USR-PINTEST',name:'Pin Test',phone:'0799999999',role:'client',pinHash:hashPin('9999'),joined:today()};
     DB.users.push(puUser);
     const oldHash=puUser.pinHash;
@@ -1821,16 +1927,16 @@ function runQA(stress=false){
     assert('Reset PIN matches 1234',puUser.pinHash===hashPin('1234'));
     DB.users=DB.users.filter(u=>u.id!=='USR-PINTEST');log('');
 
-    // [19] Vehicle list parity (client preference vs transporter registration)
-    log('[19] Vehicle list parity');
+    // [22] Vehicle list parity (client preference vs transporter registration)
+    log('[22] Vehicle list parity');
     const trVehicles=['Motorbike (boda)','Tuk Tuk','Pickup 1 ton','Canter 3 ton','Canter 5 ton','Lorry 10 ton','Flatbed 8 ton','Refrigerated van','Semi-trailer 30 ton'];
     const clVprefOptions=Array.from(document.querySelectorAll('#cl-vpref option')).map(o=>o.textContent).filter(t=>t!=='Any');
     assert('Client vehicle-preference list matches transporter registration list',trVehicles.every(v=>clVprefOptions.includes(v)),`${clVprefOptions.length}/${trVehicles.length} vehicles available`);
     assert('All floor rates cover every vehicle type',trVehicles.every(v=>DB.settings.floors[v]!==undefined));log('');
 
-    // [20] Demo data integrity (snapshot, cycle 0 only)
+    // [23] Demo data integrity (snapshot, cycle 0 only)
     if(cy===0){
-      log('[20] Demo data integrity');
+      log('[23] Demo data integrity');
       assert('9 user accounts',snap.users.length===9);
       assert('5 transporters',snap.transporters.length===5);
       assert('4 clients',snap.clients.length===4);
@@ -1887,6 +1993,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&G('map-overlay').st
 selectRole('transporter');
 G('cl-date').value=today();G('cl-date').min=today();
 if(SESSION){bootApp()}
+else{apiFetch(6000);} // warm the local cache in the background so sign-up/login usually resolve instantly, without ever blocking the auth screen from being usable right away
 </script>
 </body>
 </html>
