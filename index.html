@@ -868,29 +868,39 @@ async function signUp(){
   btnLoad('su-btn',true);
   errEl.className='auth-err info';errEl.textContent='Setting up your account…';
 
-  // Best-effort check against the shared database so two people on different
-  // devices can't grab the same phone number moments apart. Bounded to 5s —
-  // if the connection is slow or offline we proceed anyway rather than
-  // leaving the person stuck. Their account is created locally either way
-  // and syncs to the shared Sheet automatically once back online.
-  await apiFetch(5000);
-  if(DB.users.find(u=>u.phone===phone)){
-    errEl.className='auth-err';errEl.textContent='This number is already registered — log in instead';
-    authTab('login');G('li-phone').value=phone;
-    btnLoad('su-btn',false);return;
+  // Everything from here on is wrapped so that ANY unexpected failure —
+  // not just a network timeout, but a genuine bug — always resets the
+  // button and shows a visible message instead of leaving the screen
+  // looking dead with no way to tell what happened.
+  try{
+    // Best-effort check against the shared database so two people on different
+    // devices can't grab the same phone number moments apart. Bounded to 5s —
+    // if the connection is slow or offline we proceed anyway rather than
+    // leaving the person stuck. Their account is created locally either way
+    // and syncs to the shared Sheet automatically once back online.
+    await apiFetch(5000);
+    if(DB.users.find(u=>u.phone===phone)){
+      errEl.className='auth-err';errEl.textContent='This number is already registered — log in instead';
+      authTab('login');G('li-phone').value=phone;
+      return;
+    }
+
+    const user={id:uid('USR'),name,phone,role:_role,pinHash:hashPin(pin),joined:today()};
+    DB.users.push(user);persistLocal();
+    apiPost('upsert','User',user); // fire-and-forget — never blocks getting into the app
+
+    SESSION={userId:user.id,role:user.role,name:user.name,phone:user.phone};
+    if(_role==='transporter')SESSION.transporterId=null;else SESSION.clientId=null;
+    sv('session',SESSION);
+    errEl.className='auth-err';errEl.textContent='';
+    bootApp();
+    if(_role==='transporter')switchTab('tr-profile');
+  }catch(e){
+    console.error('signUp failed unexpectedly:',e);
+    errEl.className='auth-err';errEl.textContent='Something went wrong creating your account. Please try again.';
+  }finally{
+    btnLoad('su-btn',false);
   }
-
-  const user={id:uid('USR'),name,phone,role:_role,pinHash:hashPin(pin),joined:today()};
-  DB.users.push(user);persistLocal();
-  apiPost('upsert','User',user); // fire-and-forget — never blocks getting into the app
-
-  SESSION={userId:user.id,role:user.role,name:user.name,phone:user.phone};
-  if(_role==='transporter')SESSION.transporterId=null;else SESSION.clientId=null;
-  sv('session',SESSION);
-  errEl.className='auth-err';errEl.textContent='';
-  btnLoad('su-btn',false);
-  bootApp();
-  if(_role==='transporter')switchTab('tr-profile');
 }
 
 async function logIn(){
@@ -904,34 +914,44 @@ async function logIn(){
   // Check the local cache first — instant, and works fully offline for
   // anyone who has used this device before.
   let user=DB.users.find(u=>u.phone===phone);
+  let usedNetwork=false;
 
-  if(!user){
-    // Not cached locally (likely a fresh device/browser). Try a bounded
-    // network fetch — this can never hang forever even on a bad connection.
-    btnLoad('li-btn',true);
-    errEl.className='auth-err info';errEl.textContent='Checking…';
-    const ok=await apiFetch(8000);
-    user=DB.users.find(u=>u.phone===phone);
+  try{
     if(!user){
-      errEl.className='auth-err';
-      errEl.textContent=ok?'Number not found — sign up first':'Could not reach the server and no local record found. Check your connection and try again.';
-      btnLoad('li-btn',false);return;
+      // Not cached locally (likely a fresh device/browser). Try a bounded
+      // network fetch — this can never hang forever even on a bad connection.
+      usedNetwork=true;
+      btnLoad('li-btn',true);
+      errEl.className='auth-err info';errEl.textContent='Checking…';
+      const ok=await apiFetch(8000);
+      user=DB.users.find(u=>u.phone===phone);
+      if(!user){
+        errEl.className='auth-err';
+        errEl.textContent=ok?'Number not found — sign up first':'Could not reach the server and no local record found. Check your connection and try again.';
+        return;
+      }
+    } else {
+      btnLoad('li-btn',true);
     }
-  } else {
-    btnLoad('li-btn',true);
-  }
 
-  errEl.className='auth-err';
-  if(user.pinHash!==hashPin(pin)){
-    errEl.textContent='Wrong PIN';
-    [0,1,2,3].forEach(i=>G('li-p'+i)?.classList.add('pin-err'));
-    btnLoad('li-btn',false);return;
+    errEl.className='auth-err';
+    if(user.pinHash!==hashPin(pin)){
+      errEl.textContent='Wrong PIN';
+      [0,1,2,3].forEach(i=>G('li-p'+i)?.classList.add('pin-err'));
+      return;
+    }
+    errEl.textContent='';
+    const tr=DB.transporters.find(t=>t.userId===user.id);
+    const cl=DB.clients.find(c=>c.userId===user.id);
+    SESSION={userId:user.id,role:user.role,name:user.name,phone:user.phone,transporterId:tr?.id||null,clientId:cl?.id||null};
+    sv('session',SESSION);
+    bootApp();
+  }catch(e){
+    console.error('logIn failed unexpectedly:',e);
+    errEl.className='auth-err';errEl.textContent='Something went wrong logging in. Please try again.';
+  }finally{
+    btnLoad('li-btn',false);
   }
-  errEl.textContent='';
-  const tr=DB.transporters.find(t=>t.userId===user.id);
-  const cl=DB.clients.find(c=>c.userId===user.id);
-  SESSION={userId:user.id,role:user.role,name:user.name,phone:user.phone,transporterId:tr?.id||null,clientId:cl?.id||null};
-  sv('session',SESSION);btnLoad('li-btn',false);bootApp();
 }
 
 function logOut(){
@@ -1894,7 +1914,7 @@ function demoLogin(phone){
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   QA TEST SUITE — 24 groups, 115 assertions
+   QA TEST SUITE — 25 groups, 120 assertions
 ═══════════════════════════════════════════════════════════════════ */
 async function runQA(stress=false){
   const LOG=G('qa-log'),SUM=G('qa-summary');LOG.innerHTML='';SUM.innerHTML='';
@@ -2249,9 +2269,35 @@ async function runQA(stress=false){
     assert('Client vehicle-preference list matches transporter registration list',trVehicles.every(v=>clVprefOptions.includes(v)),`${clVprefOptions.length}/${trVehicles.length} vehicles available`);
     assert('All floor rates cover every vehicle type',trVehicles.every(v=>DB.settings.floors[v]!==undefined));log('');
 
-    // [24] Demo data integrity (snapshot, cycle 0 only)
+    // [24] Auth resilience — a real error inside sign-up/login must never leave the button stuck
+    log('[24] Auth error resilience');
+    // Force apiFetch to throw, simulating a genuine unexpected bug rather than a normal network failure
+    const origApiFetch=apiFetch;
+    window.apiFetch=async()=>{throw new Error('simulated unexpected failure')};
+
+    G('su-name').value='Resilience Test';
+    G('su-phone').value='0700111222';
+    ['0','1','2','3'].forEach((d,i)=>G('su-p'+i).value=['1','2','3','4'][i]);
+    _role='client';
+    await signUp();
+    assert('signUp button is re-enabled after an unexpected error (not stuck)',G('su-btn').disabled===false);
+    assert('signUp shows a visible error message instead of hanging silently',G('su-err').textContent.length>0);
+    assert('signUp did not create a half-formed user despite the thrown error',!DB.users.find(u=>u.phone==='0700111222'));
+
+    G('li-phone').value='0799888777'; // a phone guaranteed not to be cached locally, forcing the network path
+    ['0','1','2','3'].forEach((d,i)=>G('li-p'+i).value=['1','2','3','4'][i]);
+    await logIn();
+    assert('logIn button is re-enabled after an unexpected error (not stuck)',G('li-btn').disabled===false);
+    assert('logIn shows a visible error message instead of hanging silently',G('li-err').textContent.length>0);
+
+    window.apiFetch=origApiFetch; // restore the real implementation
+    G('su-name').value='';G('su-phone').value='';G('li-phone').value='';
+    ['su','li'].forEach(pfx=>[0,1,2,3].forEach(i=>{const b=G(pfx+'-p'+i);if(b){b.value='';b.classList.remove('pin-err')}}));
+    log('');
+
+    // [25] Demo data integrity (snapshot, cycle 0 only)
     if(cy===0){
-      log('[24] Demo data integrity');
+      log('[25] Demo data integrity');
       assert('9 user accounts',snap.users.length===9);
       assert('5 transporters',snap.transporters.length===5);
       assert('4 clients',snap.clients.length===4);
@@ -2268,7 +2314,7 @@ async function runQA(stress=false){
       assert('Completed request exists',snap.requests.some(r=>r.status==='Completed'));
       assert('All bids have amounts > 0',snap.bids.every(b=>b.amount>0));
       assert('BID-0003 ≤ REQ-0003 maxFare',snap.bids.find(b=>b.id==='BID-0003')?.amount<=snap.requests.find(r=>r.id==='REQ-0003')?.maxFare);
-      assert('Every demo bid distance matches its request\\'s pickup→drop-off haul, not transporter proximity',snap.bids.every(b=>{
+      assert('Every demo bid distance matches its request\'s pickup→drop-off haul, not transporter proximity',snap.bids.every(b=>{
         const req=snap.requests.find(r=>r.id===b.reqId);if(!req)return false;
         const trueHaul=haulDistance(req);
         return Math.abs(b.distKm-Math.round(trueHaul*10)/10)<0.15;
@@ -2277,7 +2323,7 @@ async function runQA(stress=false){
         const req=snap.requests.find(r=>r.id===b.reqId);const tr=snap.transporters.find(t=>t.id===b.transporterId);
         return req&&tr&&tr.capacityTons>=req.weightTons;
       }));
-      assert('Every completed/active booking\\'s distance matches its request\\'s haul distance',snap.bookings.every(b=>{
+      assert('Every completed/active booking\'s distance matches its request\'s haul distance',snap.bookings.every(b=>{
         const req=snap.requests.find(r=>r.id===b.reqId);if(!req)return true;
         const trueHaul=haulDistance(req);
         return Math.abs(b.distKm-Math.round(trueHaul*10)/10)<0.15;
