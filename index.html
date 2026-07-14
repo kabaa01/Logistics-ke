@@ -130,6 +130,19 @@ tr:hover td{background:var(--gl)}
 .bk-card{background:var(--gl);border:1.5px solid var(--g);border-radius:var(--rad);padding:12px;margin-top:8px}
 .bk-card.done{background:#f7f6f0;border-color:var(--bd)}
 .bk-card.active-tr{background:#fff8e0;border-color:var(--a)}
+.pay-card{background:#fff;border:1.5px dashed var(--bds);border-radius:var(--rad);padding:11px;margin-top:9px}
+.pay-card.pending{border-style:solid;border-color:var(--a);background:var(--al)}
+.pay-card.confirmed{border-style:solid;border-color:var(--g);background:var(--gl)}
+.pay-card.disputed{border-style:solid;border-color:var(--r);background:var(--rl)}
+.pay-methods{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+.pay-method-btn{border:1.5px solid var(--bd);border-radius:var(--rad);padding:8px 4px;text-align:center;cursor:pointer;background:#fff;font-size:11px;font-weight:600;color:var(--gr)}
+.pay-method-btn.selected{border-color:var(--g);background:var(--gl);color:var(--g)}
+.pay-method-btn .pm-icon{display:block;font-size:18px;margin-bottom:2px}
+.receipt-card{background:#fff;border:2px solid var(--g);border-radius:var(--rad);padding:14px;margin-top:9px;font-size:12.5px}
+.receipt-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--w)}
+.receipt-row:last-child{border-bottom:none}
+.receipt-title{font-family:var(--fm);font-size:16px;font-weight:900;color:var(--g);text-align:center;margin-bottom:4px}
+.receipt-sub{text-align:center;font-size:10.5px;color:var(--muted);margin-bottom:8px}
 
 /* ═══ TRANSPORTER BROWSE CARDS ══════════════════════════════════ */
 .tr-card{background:var(--ww);border:1px solid var(--bd);border-radius:var(--rad);padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
@@ -547,6 +560,7 @@ tr:hover td{background:var(--gl)}
     <div class="kpi"><div class="kpi-val" id="k-rfq">0</div><div class="kpi-lbl">Awaiting quotes</div></div>
     <div class="kpi"><div class="kpi-val" id="k-bk">0</div><div class="kpi-lbl">Bookings</div></div>
     <div class="kpi"><div class="kpi-val" id="k-rev">0</div><div class="kpi-lbl">KES booked</div></div>
+    <div class="kpi"><div class="kpi-val" id="k-paid">0</div><div class="kpi-lbl">KES confirmed paid</div></div>
   </div>
 
   <div class="card-row">
@@ -574,7 +588,7 @@ tr:hover td{background:var(--gl)}
 
   <div class="card">
     <h3>Demo data</h3>
-    <p>Load realistic data for 5 transporters, 4 clients, 7 jobs, and 2 bookings to explore all flows.</p>
+    <p>Load realistic data for 5 transporters, 4 clients, 8 jobs, and 3 bookings (including a completed payment, a pending confirmation, and an unpaid active job) to explore all flows.</p>
     <div class="btn-row">
       <button class="btn btn-a btn-sm" onclick="loadDemoData()">Load demo data</button>
       <button class="btn btn-r btn-sm" onclick="resetAll()">Clear all data</button>
@@ -631,6 +645,10 @@ const ADMIN_SECRET='LKADMIN2025';
 function uid(p){return p+'-'+Date.now().toString(36)+Math.floor(Math.random()*900+100)}
 function rad(d){return d*Math.PI/180}
 function haversine(la1,lo1,la2,lo2){const R=6371,dL=rad(la2-la1),dLo=rad(lo2-lo1),a=Math.sin(dL/2)**2+Math.cos(rad(la1))*Math.cos(rad(la2))*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))}
+// The distance that should drive the fare: pickup → drop-off (the actual cargo-carrying
+// distance). This is deliberately separate from "distance to pickup" (transporter base →
+// pickup), which only matters for matching eligibility, not for pricing the job.
+function haulDistance(req){return haversine(req.pickupLat,req.pickupLon,req.dropoffLat,req.dropoffLon)}
 function fmt(n){return Math.round(n).toLocaleString('en-KE')}
 function today(){return new Date().toISOString().split('T')[0]}
 function now(){return Date.now()}
@@ -1171,10 +1189,12 @@ function renderTrDash(){
   }
   let h='';
   instant.forEach(req=>{
-    const dist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon),fare=Math.round(tr.ratePerKm*dist*(1+req.weightTons*0.1));
+    const pickupDist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon);
+    const haul=haulDistance(req);
+    const fare=Math.round(tr.ratePerKm*haul*(1+req.weightTons*0.1));
     h+=`<div class="job-card">
       <div class="jh"><span class="j-title">${req.cargoType} · ${req.weightTons}t</span><span class="badge bd-g">⚡ Instant · KES ${fmt(fare)}</span></div>
-      <div class="j-meta"><span>👤 ${req.clientName}</span><span>📏 ${dist.toFixed(1)}km away</span></div>
+      <div class="j-meta"><span>👤 ${req.clientName}</span><span>📍 ${pickupDist.toFixed(1)}km to pickup</span><span>🚚 ${haul.toFixed(1)}km haul</span></div>
       <div class="j-loc">
         <span class="j-loc-lbl">Pickup</span><span>${req.pickupAddr||'See coordinates'}</span>
         <span class="j-loc-lbl">Drop-off</span><span>${req.dropoffAddr||''}</span>
@@ -1185,12 +1205,13 @@ function renderTrDash(){
     </div>`;
   });
   rfq.forEach(req=>{
-    const dist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon);
-    const minBid=Math.round((DB.settings.floors[tr.vehicle]||30)*dist),sug=Math.round(tr.ratePerKm*dist*(1+req.weightTons*0.1));
+    const pickupDist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon);
+    const haul=haulDistance(req);
+    const minBid=Math.round((DB.settings.floors[tr.vehicle]||30)*haul),sug=Math.round(tr.ratePerKm*haul*(1+req.weightTons*0.1));
     const mine=DB.bids.find(b=>b.reqId===req.id&&b.transporterId===tr.id&&b.status==='Pending');
     h+=`<div class="job-card rfq">
       <div class="jh"><span class="j-title">${req.cargoType} · ${req.weightTons}t</span><span class="timer-chip" id="ttr-${req.id}">⏱ ${fmtTimer(req.bidExpiresAt)}</span></div>
-      <div class="j-meta"><span>👤 ${req.clientName}</span><span>📏 ${dist.toFixed(1)}km</span><span>Min KES ${fmt(minBid)}</span>${req.maxFare?`<span>Budget KES ${fmt(req.maxFare)}</span>`:''}</div>
+      <div class="j-meta"><span>👤 ${req.clientName}</span><span>📍 ${pickupDist.toFixed(1)}km to pickup</span><span>🚚 ${haul.toFixed(1)}km haul</span><span>Min KES ${fmt(minBid)}</span>${req.maxFare?`<span>Budget KES ${fmt(req.maxFare)}</span>`:''}</div>
       <div class="j-loc">
         <span class="j-loc-lbl">Pickup</span><span>${req.pickupAddr||''}</span>
         <span class="j-loc-lbl">Drop-off</span><span>${req.dropoffAddr||''}</span>
@@ -1235,6 +1256,7 @@ function renderTrBookings(){
         ${isPicked?`<button class="btn btn-g btn-sm" onclick="trDelivered('${bk.id}')">Delivered</button>`:''}
         ${(isActive||isPicked)?`<button class="btn btn-ghost btn-sm" onclick="cancelBookingTr('${bk.id}')">Cancel</button>`:''}
       </div>
+      ${renderPaymentBlock(bk,'transporter')}
     </div>`;
   });
   G('tr-bk-list').innerHTML=h;
@@ -1258,8 +1280,9 @@ function trDelivered(bkId){
 }
 
 function cancelBookingTr(bkId){
-  if(!confirm('Cancel this booking? This will notify the client.'))return;
   const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
+  if(bk.payment?.status==='Confirmed'){toast('Payment already confirmed for this booking — it can no longer be cancelled','err');return}
+  if(!confirm('Cancel this booking? This will notify the client.'))return;
   bk.status='Cancelled';persistLocal();apiPost('upsert','Booking',bk);
   const req=DB.requests.find(r=>r.id===bk.reqId);
   if(req){req.status='Cancelled';apiPost('upsert','Request',req)}
@@ -1287,8 +1310,8 @@ function claimInstant(reqId,trId){
   const req=DB.requests.find(r=>r.id===reqId),tr=DB.transporters.find(t=>t.id===trId);
   if(!req||req.status!=='Open'){toast('Job no longer available','err');renderTrDash();return}
   if(!eligibleFor(tr,req,false)){toast('No longer eligible for this job','err');return}
-  const dist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon);
-  createBooking(req,tr,dist,Math.round(tr.ratePerKm*dist*(1+req.weightTons*0.1)),'instant');
+  const haul=haulDistance(req);
+  createBooking(req,tr,haul,Math.round(tr.ratePerKm*haul*(1+req.weightTons*0.1)),'instant');
   toast('Job accepted!');switchTab('tr-bookings');
 }
 
@@ -1297,13 +1320,13 @@ function placeBid(reqId,trId){
   if(!req||req.status!=='RFQ'||req.bidExpiresAt<=now()){toast('Bid window closed','err');return}
   const amt=parseFloat(G('bid-'+reqId)?.value);
   if(!amt||amt<=0){toast('Enter a valid amount','err');return}
-  const dist=haversine(req.pickupLat,req.pickupLon,tr.baseLat,tr.baseLon);
-  const minBid=Math.round((DB.settings.floors[tr.vehicle]||30)*dist);
+  const haul=haulDistance(req);
+  const minBid=Math.round((DB.settings.floors[tr.vehicle]||30)*haul);
   if(amt<minBid){toast(`Minimum bid is KES ${fmt(minBid)} for ${tr.vehicle}`,'err');return}
   if(req.maxFare&&amt>req.maxFare){toast(`Client's budget is KES ${fmt(req.maxFare)}`,'err');return}
   const existing=DB.bids.find(b=>b.reqId===reqId&&b.transporterId===trId&&b.status==='Pending');
   if(existing){existing.amount=amt;apiPost('upsert','Bid',existing);persistLocal();toast('Bid updated');renderTrDash();return}
-  const bid={id:uid('BID'),reqId,transporterId:trId,transporterName:tr.name,phone:tr.phone,vehicle:tr.vehicle,distKm:Math.round(dist*10)/10,amount:amt,status:'Pending',submittedAt:now()};
+  const bid={id:uid('BID'),reqId,transporterId:trId,transporterName:tr.name,phone:tr.phone,vehicle:tr.vehicle,distKm:Math.round(haul*10)/10,amount:amt,status:'Pending',submittedAt:now()};
   DB.bids.push(bid);persistLocal();apiPost('upsert','Bid',bid);
   const cl=DB.clients.find(c=>c.userId===req.clientUserId);
   if(cl)logMsg(cl.phone,`New quote on your job: ${tr.name} (${tr.vehicle}) — KES ${fmt(amt)}, ${dist.toFixed(1)}km away.`,'bid');
@@ -1419,10 +1442,11 @@ function renderClDash(){
           <button class="btn btn-g btn-xs" onclick="clCompleteBooking('${bk.id}')">Mark delivered</button>
           <button class="btn btn-r btn-xs" onclick="clCancelBooking('${bk.id}')">Cancel</button>
         </div>
+        ${renderPaymentBlock(bk,'client')}
       </div>`;
     }
     if(bk&&bk.status==='Completed'){
-      h+=`<div class="bk-card done"><div style="font-size:12px;color:var(--gr)">✓ Delivered by ${bk.transporterName} · KES ${fmt(bk.fare)}</div></div>`;
+      h+=`<div class="bk-card done"><div style="font-size:12px;color:var(--gr)">✓ Delivered by ${bk.transporterName} · KES ${fmt(bk.fare)}</div>${renderPaymentBlock(bk,'client')}</div>`;
     }
     if(req.status==='Open'||req.status==='RFQ'){
       h+=`<div class="btn-row"><button class="btn btn-ghost btn-xs" onclick="cancelRequest('${req.id}')">Cancel job</button></div>`;
@@ -1480,8 +1504,9 @@ function clCompleteBooking(bkId){
 }
 
 function clCancelBooking(bkId){
-  if(!confirm('Cancel this booking?'))return;
   const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
+  if(bk.payment?.status==='Confirmed'){toast('Payment already confirmed for this booking — it can no longer be cancelled','err');return}
+  if(!confirm('Cancel this booking?'))return;
   bk.status='Cancelled';apiPost('upsert','Booking',bk);
   const req=DB.requests.find(r=>r.id===bk.reqId);if(req){req.status='Cancelled';apiPost('upsert','Request',req)}
   logMsg(bk.transporterPhone,`Booking ${bkId} was cancelled by the client.`,'cancellation');
@@ -1522,13 +1547,191 @@ function renderTransporterBrowse(){
 function createBooking(req,tr,dist,fare,source){
   const bk={id:uid('BK'),reqId:req.id,transporterId:tr.id,transporterName:tr.name,transporterPhone:tr.phone,
     clientName:req.clientName,clientPhone:req.clientPhone,cargo:req.cargoType,
-    distKm:Math.round(dist*10)/10,fare:Math.round(fare),status:'Active',source,createdAt:now()};
+    distKm:Math.round(dist*10)/10,fare:Math.round(fare),status:'Active',source,createdAt:now(),
+    payment:{status:'Unpaid',method:null,reference:null,amount:null,clientSubmittedAt:null,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null}};
   DB.bookings.push(bk);req.status='Booked';persistLocal();
   apiPost('upsert','Booking',bk);apiPost('upsert','Request',req);
   const locMsg=req.pickupAddr?`Pickup: ${req.pickupAddr}${req.pickupComment?' ('+req.pickupComment+')':''}. Drop-off: ${req.dropoffAddr||''}${req.dropoffComment?' ('+req.dropoffComment+')':''}.`:`Pickup: ${req.pickupLat?.toFixed(4)},${req.pickupLon?.toFixed(4)}.`;
   const msg=`Booking ${bk.id}: ${req.cargoType} ${req.weightTons}t. ${locMsg} Fare: KES ${fmt(bk.fare)}.`;
   logMsg(tr.phone,msg,'booking');logMsg(req.clientPhone,msg,'booking');
   return bk;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PAYMENT & RECEIPT WORKFLOW
+   Every booking carries a `payment` object. Flow:
+     Unpaid → (client submits method+reference) → Pending →
+     (transporter confirms) → Confirmed (receipt issued)
+                            → (transporter disputes) → Disputed →
+     (client resubmits) → Pending again
+   Cash follows the same state machine — the client's tap of "I paid cash"
+   is the "submission", and the transporter's confirmation closes it out,
+   giving both sides a mutual acknowledgment even without a bank reference.
+═══════════════════════════════════════════════════════════════════ */
+const PAY_METHODS=[
+  {id:'mpesa',label:'M-Pesa',icon:'📱'},
+  {id:'airtel',label:'Airtel Money',icon:'💳'},
+  {id:'bank',label:'Bank / Card',icon:'🏦'},
+  {id:'cash',label:'Cash',icon:'💵'}
+];
+
+function ensurePayment(bk){
+  if(!bk.payment)bk.payment={status:'Unpaid',method:null,reference:null,amount:null,clientSubmittedAt:null,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null};
+  return bk.payment;
+}
+
+let _paySelectMethod={};
+function selectPayMethod(bkId,method){
+  _paySelectMethod[bkId]=method;
+  document.querySelectorAll(`#pm-${bkId} .pay-method-btn`).forEach(b=>b.classList.toggle('selected',b.dataset.m===method));
+  const refWrap=G(`payref-wrap-${bkId}`);
+  if(refWrap)refWrap.style.display=(method==='cash')?'none':'block';
+}
+
+function submitPayment(bkId){
+  const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
+  const pay=ensurePayment(bk);
+  const method=_paySelectMethod[bkId];
+  if(!method){toast('Choose a payment method first','err');return}
+  let reference=null;
+  if(method!=='cash'){
+    reference=(G(`payref-${bkId}`)?.value||'').trim();
+    if(!reference){toast('Enter the transaction reference / code from your payment confirmation','err');return}
+  }
+  pay.status='Pending';pay.method=method;pay.reference=reference;pay.amount=bk.fare;
+  pay.clientSubmittedAt=now();pay.disputeReason=null;pay.disputedAt=null;
+  persistLocal();apiPost('upsert','Booking',bk);
+  const methodLabel=PAY_METHODS.find(m=>m.id===method)?.label||method;
+  logMsg(bk.transporterPhone,`Payment submitted for booking ${bk.id}: KES ${fmt(bk.fare)} via ${methodLabel}${reference?' (Ref: '+reference+')':''}. Please confirm receipt in the app.`,'payment');
+  toast('Payment submitted — waiting for transporter to confirm');
+  renderClDash();
+}
+
+function resubmitPayment(bkId){
+  const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
+  const pay=ensurePayment(bk);
+  pay.status='Unpaid';pay.method=null;pay.reference=null;pay.disputeReason=null;pay.disputedAt=null;
+  persistLocal();apiPost('upsert','Booking',bk);
+  renderClDash();
+}
+
+function confirmPaymentReceived(bkId){
+  const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
+  const pay=ensurePayment(bk);
+  if(pay.status!=='Pending'){toast('No pending payment to confirm','err');return}
+  pay.status='Confirmed';pay.transporterConfirmedAt=now();
+  pay.receiptId=uid('RCT');pay.receiptIssuedAt=now();
+  persistLocal();apiPost('upsert','Booking',bk);
+  const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method;
+  logMsg(bk.clientPhone,`Payment confirmed for booking ${bk.id}: KES ${fmt(pay.amount)} via ${methodLabel}. Receipt ${pay.receiptId} issued. Thank you!`,'payment');
+  toast('Payment confirmed — receipt issued');
+  renderTrBookings();
+}
+
+function disputePayment(bkId){
+  const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
+  const pay=ensurePayment(bk);
+  if(pay.status!=='Pending'){toast('No pending payment to dispute','err');return}
+  const reason=prompt('Why are you disputing this payment? (e.g. "Reference code does not match", "Amount not received")');
+  if(!reason)return;
+  pay.status='Disputed';pay.disputeReason=reason.trim();pay.disputedAt=now();
+  persistLocal();apiPost('upsert','Booking',bk);
+  logMsg(bk.clientPhone,`Payment for booking ${bk.id} was disputed by the transporter: "${reason.trim()}". Please review and resubmit in the app.`,'payment-dispute');
+  toast('Payment disputed — client notified','warn');
+  renderTrBookings();
+}
+
+function resolveDispute(bkId){
+  const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
+  if(!confirm('Reset this disputed payment so the client can resubmit?'))return;
+  const pay=ensurePayment(bk);
+  pay.status='Unpaid';pay.method=null;pay.reference=null;pay.disputeReason=null;pay.disputedAt=null;
+  persistLocal();apiPost('upsert','Booking',bk);
+  toast('Dispute resolved — client can resubmit payment');
+  renderAdmin();
+}
+
+function receiptText(bk){
+  const pay=ensurePayment(bk);
+  const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method||'—';
+  return `LOGISTICS-KE RECEIPT ${pay.receiptId}
+Booking: ${bk.id}
+Transporter: ${bk.transporterName} (${bk.transporterPhone})
+Client: ${bk.clientName} (${bk.clientPhone})
+Cargo: ${bk.cargo}, ${bk.distKm}km
+Amount: KES ${fmt(pay.amount)}
+Method: ${methodLabel}${pay.reference?' — Ref '+pay.reference:''}
+Confirmed: ${new Date(pay.transporterConfirmedAt).toLocaleString('en-KE')}`;
+}
+
+function renderPaymentBlock(bk,role){
+  const pay=ensurePayment(bk);
+  if(bk.status!=='Picked up'&&bk.status!=='Completed')return''; // payment only relevant once the job is underway or done
+
+  if(pay.status==='Confirmed'){
+    const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method;
+    return `<div class="pay-card confirmed">
+      <div style="font-weight:700;color:var(--g)">✓ Payment confirmed — KES ${fmt(pay.amount)} via ${methodLabel}</div>
+      <div class="btn-row"><button class="btn btn-o btn-xs" onclick="toggleReceipt('${bk.id}')">🧾 View receipt</button></div>
+      <div id="receipt-${bk.id}" style="display:none">${renderReceiptCard(bk)}</div>
+    </div>`;
+  }
+
+  if(pay.status==='Disputed'){
+    return `<div class="pay-card disputed">
+      <div style="font-weight:700;color:var(--r)">⚠ Payment disputed by transporter</div>
+      <div style="font-size:11.5px;color:var(--gr);margin:4px 0">"${pay.disputeReason||''}"</div>
+      ${role==='client'?`<div class="btn-row"><button class="btn btn-a btn-xs" onclick="resubmitPayment('${bk.id}')">Resubmit payment</button></div>`:`<div style="font-size:11px;color:var(--muted)">Waiting for client to resubmit</div>`}
+    </div>`;
+  }
+
+  if(pay.status==='Pending'){
+    const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method;
+    if(role==='transporter'){
+      return `<div class="pay-card pending">
+        <div style="font-weight:700">Client says paid: KES ${fmt(pay.amount)} via ${methodLabel}${pay.reference?' — Ref '+pay.reference:''}</div>
+        <div class="btn-row">
+          <button class="btn btn-g btn-xs" onclick="confirmPaymentReceived('${bk.id}')">✓ Confirm received</button>
+          <button class="btn btn-r btn-xs" onclick="disputePayment('${bk.id}')">⚠ Dispute</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="pay-card pending"><div style="font-size:12px">⏳ Waiting for transporter to confirm your payment (${methodLabel}${pay.reference?' — Ref '+pay.reference:''})</div></div>`;
+  }
+
+  // Unpaid
+  if(role==='client'){
+    return `<div class="pay-card">
+      <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">Confirm payment · KES ${fmt(bk.fare)}</div>
+      <div class="pay-methods" id="pm-${bk.id}">
+        ${PAY_METHODS.map(m=>`<div class="pay-method-btn" data-m="${m.id}" onclick="selectPayMethod('${bk.id}','${m.id}')"><span class="pm-icon">${m.icon}</span>${m.label}</div>`).join('')}
+      </div>
+      <div id="payref-wrap-${bk.id}" style="display:none;margin-bottom:6px"><input id="payref-${bk.id}" placeholder="Transaction code / reference (from your M-Pesa, Airtel, or bank SMS)"></div>
+      <div class="btn-row"><button class="btn btn-g btn-xs" onclick="submitPayment('${bk.id}')">I've paid</button></div>
+    </div>`;
+  }
+  return `<div class="pay-card"><div style="font-size:11.5px;color:var(--muted)">Awaiting payment from client</div></div>`;
+}
+
+function toggleReceipt(bkId){
+  const el=G(`receipt-${bkId}`);if(!el)return;
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+
+function renderReceiptCard(bk){
+  const pay=ensurePayment(bk);
+  const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method;
+  return `<div class="receipt-card">
+    <div class="receipt-title">🧾 Receipt</div>
+    <div class="receipt-sub">${pay.receiptId} · ${pay.receiptIssuedAt?new Date(pay.receiptIssuedAt).toLocaleString('en-KE'):''}</div>
+    <div class="receipt-row"><span>Booking</span><strong>${bk.id}</strong></div>
+    <div class="receipt-row"><span>Transporter</span><strong>${bk.transporterName}</strong></div>
+    <div class="receipt-row"><span>Client</span><strong>${bk.clientName}</strong></div>
+    <div class="receipt-row"><span>Cargo</span><strong>${bk.cargo}, ${bk.distKm}km</strong></div>
+    <div class="receipt-row"><span>Amount</span><strong>KES ${fmt(pay.amount)}</strong></div>
+    <div class="receipt-row"><span>Method</span><strong>${methodLabel}${pay.reference?' · Ref '+pay.reference:''}</strong></div>
+    <div class="btn-row" style="margin-top:8px">${notifyLinks(bk.clientPhone,receiptText(bk),'receipt')}</div>
+  </div>`;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1542,10 +1745,15 @@ function renderAdmin(){
   G('k-rfq').textContent=DB.requests.filter(r=>r.status==='RFQ').length;
   G('k-bk').textContent=DB.bookings.filter(b=>b.status==='Active'||b.status==='Picked up').length;
   G('k-rev').textContent=fmt(DB.bookings.reduce((s,b)=>s+b.fare,0));
+  G('k-paid').textContent=fmt(DB.bookings.filter(b=>b.payment?.status==='Confirmed').reduce((s,b)=>s+(b.payment.amount||b.fare),0));
 
   G('adm-users').innerHTML=DB.users.length?`<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Role</th><th>Joined</th><th></th></tr></thead><tbody>${DB.users.map(u=>`<tr><td>${u.name}</td><td>${u.phone}</td><td><span class="badge bd-b">${u.role}</span></td><td>${u.joined}</td><td><button class="btn btn-ghost btn-xs" onclick="adminResetPin('${u.id}')">Reset PIN</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No users yet</div>';
 
-  G('adm-bk').innerHTML=DB.bookings.length?`<div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Transporter</th><th>Client</th><th>Fare</th><th>Status</th></tr></thead><tbody>${[...DB.bookings].reverse().map(b=>`<tr><td>${b.id}</td><td>${b.transporterName}</td><td>${b.clientName}</td><td>KES ${fmt(b.fare)}</td><td><span class="badge ${b.status==='Completed'?'bd-muted':b.status==='Cancelled'?'bd-r':'bd-g'}">${b.status}</span></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No bookings yet</div>';
+  G('adm-bk').innerHTML=DB.bookings.length?`<div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Transporter</th><th>Client</th><th>Fare</th><th>Status</th><th>Payment</th><th></th></tr></thead><tbody>${[...DB.bookings].reverse().map(b=>{
+    const pay=b.payment||{status:'Unpaid'};
+    const payCls={Unpaid:'bd-muted',Pending:'bd-a',Confirmed:'bd-g',Disputed:'bd-r'}[pay.status]||'bd-muted';
+    return`<tr><td>${b.id}</td><td>${b.transporterName}</td><td>${b.clientName}</td><td>KES ${fmt(b.fare)}</td><td><span class="badge ${b.status==='Completed'?'bd-muted':b.status==='Cancelled'?'bd-r':'bd-g'}">${b.status}</span></td><td><span class="badge ${payCls}">${pay.status}</span></td><td>${pay.status==='Disputed'?`<button class="btn btn-ghost btn-xs" onclick="resolveDispute('${b.id}')">Resolve</button>`:''}</td></tr>`;
+  }).join('')}</tbody></table></div>`:'<div class="empty">No bookings yet</div>';
 
   G('adm-req').innerHTML=DB.requests.length?`<div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Client</th><th>Cargo</th><th>Mode</th><th>Status</th></tr></thead><tbody>${[...DB.requests].reverse().map(r=>`<tr><td>${r.id}</td><td>${r.clientName}</td><td>${r.cargoType} ${r.weightTons}t</td><td>${r.mode==='rfq'?'Quote':'Instant'}</td><td><span class="badge ${({Open:'bd-b',RFQ:'bd-a',Booked:'bd-g',Completed:'bd-muted',Cancelled:'bd-r'})[r.status]||'bd-b'}">${r.status}</span></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No requests yet</div>';
 
@@ -1641,22 +1849,26 @@ function loadDemoData(){
     {id:'REQ-0004',clientUserId:'USR-ME09',clientId:'CL-ME09',clientName:'Makini Electronics',clientPhone:'0704900009',cargoType:'Electronics',weightTons:1.2,pickupLat:-1.3200,pickupLon:36.8300,pickupAddr:'Makini Warehouse, South B',pickupComment:'Fragile. Tail-lift required. Sign manifest.',dropoffLat:-1.2680,dropoffLon:36.8070,dropoffAddr:'Westlands Showroom, Ring Road',dropoffComment:'3rd floor. Goods lift available.',date:today(),mode:'instant',status:'Booked',createdAt:now()-3600000},
     {id:'REQ-0005',clientUserId:'USR-FF08',clientId:'CL-FF08',clientName:'FreshFarms Produce',clientPhone:'0703800008',cargoType:'General goods',weightTons:1,pickupLat:-1.2640,pickupLon:36.8040,pickupAddr:'FreshFarms Packhouse, Westlands',pickupComment:'Boxes of water. Easy load.',dropoffLat:-1.0476,dropoffLon:36.6824,dropoffAddr:'Kiambu Distributor Hub',dropoffComment:'Blue warehouse, off Kiambu Road.',date:today(),mode:'instant',status:'Open',createdAt:now()-600000},
     {id:'REQ-0006',clientUserId:'USR-GT06',clientId:'CL-GT06',clientName:'Greenleaf Tea Ltd',clientPhone:'0701600006',cargoType:'FMCG / retail stock',weightTons:3,pickupLat:-1.0481,pickupLon:36.6504,pickupAddr:'Limuru Tea Farm, Kiambu',pickupComment:'',dropoffLat:0.5143,dropoffLon:35.2698,dropoffAddr:'Eldoret Distributor',dropoffComment:'',date:'2025-05-20',mode:'rfq',status:'Cancelled',createdAt:PAST-172800000},
-    {id:'REQ-0007',clientUserId:'USR-NH07',clientId:'CL-NH07',clientName:'Nairobi Hardware Supplies',clientPhone:'0702700007',cargoType:'Building materials',weightTons:9.5,pickupLat:-1.3100,pickupLon:36.8200,pickupAddr:'Nairobi Hardware, Enterprise Rd',pickupComment:'Portland cement, 380 bags.',dropoffLat:-0.3031,dropoffLon:36.0800,dropoffAddr:'Nakuru Hardware Depot, Section 58',dropoffComment:'Weigh bridge clearance required.',date:today(),mode:'rfq',status:'RFQ',bidWindowSecs:3600,bidExpiresAt:now()+2700000,maxFare:null,vehiclePref:'',createdAt:now()-3600000}
+    {id:'REQ-0007',clientUserId:'USR-NH07',clientId:'CL-NH07',clientName:'Nairobi Hardware Supplies',clientPhone:'0702700007',cargoType:'Building materials',weightTons:9.5,pickupLat:-1.3100,pickupLon:36.8200,pickupAddr:'Nairobi Hardware, Enterprise Rd',pickupComment:'Portland cement, 380 bags.',dropoffLat:-0.3031,dropoffLon:36.0800,dropoffAddr:'Nakuru Hardware Depot, Section 58',dropoffComment:'Weigh bridge clearance required.',date:today(),mode:'rfq',status:'RFQ',bidWindowSecs:3600,bidExpiresAt:now()+2700000,maxFare:null,vehiclePref:'',createdAt:now()-3600000},
+    {id:'REQ-0008',clientUserId:'USR-NH07',clientId:'CL-NH07',clientName:'Nairobi Hardware Supplies',clientPhone:'0702700007',cargoType:'Building materials',weightTons:4,pickupLat:-1.3100,pickupLon:36.8200,pickupAddr:'Nairobi Hardware, Enterprise Rd',pickupComment:'Cash on delivery arranged with driver.',dropoffLat:-1.2864,dropoffLon:36.8172,dropoffAddr:'CBD Construction Site, Nairobi',dropoffComment:'Site foreman: ask for Kamau.',date:today(),mode:'instant',status:'Booked',createdAt:now()-7200000}
   ];
   DB.bids=[
-    {id:'BID-0001',reqId:'REQ-0003',transporterId:'TR-GN04',transporterName:'Grace Njeri Refrigerated',phone:'0711400004',vehicle:'Refrigerated van',distKm:2.4,amount:4800,status:'Pending',submittedAt:now()-600000},
-    {id:'BID-0002',reqId:'REQ-0003',transporterId:'TR-AW02',transporterName:'Alice Wanjiku Logistics',phone:'0723200002',vehicle:'Pickup 1 ton',distKm:1.8,amount:5200,status:'Pending',submittedAt:now()-480000},
-    {id:'BID-0003',reqId:'REQ-0003',transporterId:'TR-JM01',transporterName:'John Mwangi Transport',phone:'0722100001',vehicle:'Canter 5 ton',distKm:3.1,amount:5800,status:'Pending',submittedAt:now()-300000},
-    {id:'BID-0004',reqId:'REQ-0007',transporterId:'TR-DO03',transporterName:'David Otieno Carriers',phone:'0720300003',vehicle:'Lorry 10 ton',distKm:4.2,amount:18500,status:'Pending',submittedAt:now()-1800000},
-    {id:'BID-0005',reqId:'REQ-0007',transporterId:'TR-PK05',transporterName:'Peter Kamau Haulage',phone:'0712500005',vehicle:'Canter 5 ton',distKm:8.3,amount:22000,status:'Pending',submittedAt:now()-900000}
+    {id:'BID-0001',reqId:'REQ-0003',transporterId:'TR-GN04',transporterName:'Grace Njeri Refrigerated',phone:'0711400004',vehicle:'Refrigerated van',distKm:2.9,amount:1200,status:'Pending',submittedAt:now()-600000},
+    {id:'BID-0002',reqId:'REQ-0003',transporterId:'TR-AW02',transporterName:'Alice Wanjiku Logistics',phone:'0723200002',vehicle:'Pickup 1 ton',distKm:2.9,amount:900,status:'Pending',submittedAt:now()-480000},
+    {id:'BID-0003',reqId:'REQ-0003',transporterId:'TR-JM01',transporterName:'John Mwangi Transport',phone:'0722100001',vehicle:'Canter 5 ton',distKm:2.9,amount:1100,status:'Pending',submittedAt:now()-300000},
+    {id:'BID-0004',reqId:'REQ-0007',transporterId:'TR-DO03',transporterName:'David Otieno Carriers',phone:'0720300003',vehicle:'Lorry 10 ton',distKm:138.9,amount:21000,status:'Pending',submittedAt:now()-1800000}
   ];
   DB.bookings=[
-    {id:'BK-0001',reqId:'REQ-0001',transporterId:'TR-JM01',transporterName:'John Mwangi Transport',transporterPhone:'0722100001',clientName:'Greenleaf Tea Ltd',clientPhone:'0701600006',cargo:'Agricultural produce',distKm:28.4,fare:5892,status:'Completed',source:'instant',createdAt:PAST-86400000},
-    {id:'BK-0002',reqId:'REQ-0004',transporterId:'TR-AW02',transporterName:'Alice Wanjiku Logistics',transporterPhone:'0723200002',clientName:'Makini Electronics',clientPhone:'0704900009',cargo:'Electronics',distKm:6.7,fare:5996,status:'Active',source:'instant',createdAt:now()-3600000}
+    {id:'BK-0001',reqId:'REQ-0001',transporterId:'TR-JM01',transporterName:'John Mwangi Transport',transporterPhone:'0722100001',clientName:'Greenleaf Tea Ltd',clientPhone:'0701600006',cargo:'Agricultural produce',distKm:34.5,fare:2156,status:'Completed',source:'instant',createdAt:PAST-86400000,
+     payment:{status:'Confirmed',method:'mpesa',reference:'QGH7K2LMNP',amount:2156,clientSubmittedAt:PAST-3600000,transporterConfirmedAt:PAST-1800000,disputeReason:null,disputedAt:null,receiptId:'RCT-DEMO001',receiptIssuedAt:PAST-1800000}},
+    {id:'BK-0002',reqId:'REQ-0004',transporterId:'TR-AW02',transporterName:'Alice Wanjiku Logistics',transporterPhone:'0723200002',clientName:'Makini Electronics',clientPhone:'0704900009',cargo:'Electronics',distKm:6.3,fare:496,status:'Active',source:'instant',createdAt:now()-3600000,
+     payment:{status:'Unpaid',method:null,reference:null,amount:null,clientSubmittedAt:null,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null}},
+    {id:'BK-0003',reqId:'REQ-0008',transporterId:'TR-PK05',transporterName:'Peter Kamau Haulage',transporterPhone:'0712500005',clientName:'Nairobi Hardware Supplies',clientPhone:'0702700007',cargo:'Building materials',distKm:2.6,fare:222,status:'Picked up',source:'instant',createdAt:now()-7200000,
+     payment:{status:'Pending',method:'mpesa',reference:'RJT4X9QPLM',amount:222,clientSubmittedAt:now()-900000,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null}}
   ];
   DB.msgs=[
-    {id:'MSG-001',phone:'0722100001',msg:'Booking BK-0001: Agricultural produce 2.5t. Pickup: Limuru Tea Farm → Nairobi Tea Packers. Fare KES 5,892.',type:'booking',time:'01/06/2025, 07:14'},
-    {id:'MSG-002',phone:'0701600006',msg:'Booking BK-0001: Agricultural produce 2.5t. Pickup: Limuru Tea Farm → Nairobi Tea Packers. Fare KES 5,892.',type:'booking',time:'01/06/2025, 07:14'},
+    {id:'MSG-001',phone:'0722100001',msg:'Booking BK-0001: Agricultural produce 2.5t. Pickup: Limuru Tea Farm → Nairobi Tea Packers. Fare KES 2,156.',type:'booking',time:'01/06/2025, 07:14'},
+    {id:'MSG-002',phone:'0701600006',msg:'Booking BK-0001: Agricultural produce 2.5t. Pickup: Limuru Tea Farm → Nairobi Tea Packers. Fare KES 2,156.',type:'booking',time:'01/06/2025, 07:14'},
     {id:'MSG-003',phone:'0723200002',msg:'New instant job: Electronics 1.2t near Makini Warehouse, South B.',type:'job-alert',time:new Date().toLocaleString('en-KE')}
   ];
   persistLocal();
@@ -1682,7 +1894,7 @@ function demoLogin(phone){
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   QA TEST SUITE — 23 groups, 83 assertions
+   QA TEST SUITE — 24 groups, 115 assertions
 ═══════════════════════════════════════════════════════════════════ */
 async function runQA(stress=false){
   const LOG=G('qa-log'),SUM=G('qa-summary');LOG.innerHTML='';SUM.innerHTML='';
@@ -1757,6 +1969,25 @@ async function runQA(stress=false){
     assert('More distance → higher fare',cf(50,20,2)>cf(50,10,2));
     assert('Higher rate → higher fare',cf(80,10,2)>cf(50,10,2));log('');
 
+    // [7b] Fare must be driven by the haul (pickup→drop-off), not proximity to the transporter's base.
+    // This is a direct regression test for a real bug found in production: fares were once calculated
+    // from "distance to pickup" instead of the actual cargo-carrying distance, meaning a transporter
+    // parked right next to the pickup point could be charged almost nothing for hauling cargo hundreds
+    // of kilometres away.
+    log('[7b] Fare driven by haul distance, not pickup proximity');
+    const coLocatedTr={ratePerKm:50};
+    const shortHopReq={pickupLat:-1.2921,pickupLon:36.8219,dropoffLat:-1.2925,dropoffLon:36.8223,weightTons:1}; // pickup ≈ drop-off, ~50m apart
+    const longHaulReq={pickupLat:-1.2921,pickupLon:36.8219,dropoffLat:-4.0435,dropoffLon:39.6682,weightTons:1}; // pickup → Mombasa, ~440km, transporter imagined right at the pickup point
+    const shortHaul=haulDistance(shortHopReq);
+    const longHaul=haulDistance(longHaulReq);
+    const shortFare=Math.round(coLocatedTr.ratePerKm*shortHaul*(1+shortHopReq.weightTons*0.1));
+    const longFare=Math.round(coLocatedTr.ratePerKm*longHaul*(1+longHaulReq.weightTons*0.1));
+    assert('haulDistance reflects the real cargo trip, unaffected by where the transporter is based',longHaul>400,`${longHaul.toFixed(1)}km`);
+    assert('A ~50m local hop produces a tiny fare',shortFare<50,`KES ${shortFare}`);
+    assert('A ~440km haul produces a substantial fare even if the transporter is right at the pickup point',longFare>15000,`KES ${fmt(longFare)}`);
+    assert('Long-haul fare is dramatically higher than short-hop fare for the same rate',longFare>shortFare*100);
+    log('');
+
     // [8] Instant booking flow
     log('[8] Instant booking end-to-end');
     const b0=DB.bookings.length,m0=DB.msgs.length;
@@ -1767,12 +1998,13 @@ async function runQA(stress=false){
     const eTr=DB.transporters.find(t=>t.status==='Active'&&t.capacityTons>=1);
     assert('Found eligible transporter',!!eTr,eTr?.name);
     if(eTr){
-      const dist=haversine(tReq.pickupLat,tReq.pickupLon,eTr.baseLat,eTr.baseLon);
-      const fare=Math.round(eTr.ratePerKm*dist*(1+tReq.weightTons*0.1));
-      createBooking(tReq,eTr,dist,fare,'instant');
+      const haul=haulDistance(tReq);
+      const fare=Math.round(eTr.ratePerKm*haul*(1+tReq.weightTons*0.1));
+      createBooking(tReq,eTr,haul,fare,'instant');
       assert('Booking created',DB.bookings.length===b0+1);
       assert('Request → Booked',tReq.status==='Booked');
       assert('Fare > 0',fare>0,`KES ${fmt(fare)}`);
+      assert('Booking distance matches pickup→drop-off, not transporter proximity',Math.abs(DB.bookings[DB.bookings.length-1].distKm-Math.round(haul*10)/10)<0.01);
       assert('2 SMS notifications sent',DB.msgs.length>=m0+2);
     }
     DB.requests=DB.requests.filter(r=>r.id!=='REQ-TST');
@@ -1789,11 +2021,11 @@ async function runQA(stress=false){
     const bTr=DB.transporters.find(t=>t.pref!=='instant');
     assert('RFQ-capable transporter found',!!bTr,bTr?.name);
     if(bTr){
-      const dist=haversine(rReq.pickupLat,rReq.pickupLon,bTr.baseLat,bTr.baseLon);
-      const minBid=Math.round((DB.settings.floors[bTr.vehicle]||30)*dist);
+      const haul=haulDistance(rReq);
+      const minBid=Math.round((DB.settings.floors[bTr.vehicle]||30)*haul);
       const validAmt=minBid+1000;
       const b0b=DB.bids.length;
-      const bid={id:uid('BID'),reqId:rReq.id,transporterId:bTr.id,transporterName:bTr.name,phone:bTr.phone,vehicle:bTr.vehicle,distKm:Math.round(dist*10)/10,amount:validAmt,status:'Pending',submittedAt:now()};
+      const bid={id:uid('BID'),reqId:rReq.id,transporterId:bTr.id,transporterName:bTr.name,phone:bTr.phone,vehicle:bTr.vehicle,distKm:Math.round(haul*10)/10,amount:validAmt,status:'Pending',submittedAt:now()};
       DB.bids.push(bid);
       assert('Bid saved',DB.bids.length===b0b+1);
       assert('Bid amount above floor',bid.amount>=minBid,`KES ${fmt(bid.amount)} ≥ ${fmt(minBid)}`);
@@ -1927,24 +2159,107 @@ async function runQA(stress=false){
     assert('Reset PIN matches 1234',puUser.pinHash===hashPin('1234'));
     DB.users=DB.users.filter(u=>u.id!=='USR-PINTEST');log('');
 
-    // [22] Vehicle list parity (client preference vs transporter registration)
-    log('[22] Vehicle list parity');
+    // [22] Payment confirmation workflow (full lifecycle)
+    log('[22] Payment workflow');
+    assert('PAY_METHODS has exactly 3 digital methods + cash',PAY_METHODS.length===4&&PAY_METHODS.filter(m=>m.id!=='cash').length===3);
+    assert('PAY_METHODS includes M-Pesa, Airtel Money, Bank/Card, Cash',['mpesa','airtel','bank','cash'].every(id=>PAY_METHODS.some(m=>m.id===id)));
+
+    // Fresh booking defaults
+    const payTestBk={id:'BK-PAYTEST',reqId:'REQ-0001',transporterId:'TR-JM01',transporterName:'John Mwangi Transport',transporterPhone:'0722100001',clientName:'Test Client',clientPhone:'0700000001',cargo:'Test cargo',distKm:5,fare:500,status:'Active',source:'instant',createdAt:now()};
+    const pay=ensurePayment(payTestBk);
+    assert('New booking defaults to Unpaid',pay.status==='Unpaid');
+    assert('renderPaymentBlock hides while booking is only Active (not yet picked up)',renderPaymentBlock(payTestBk,'client')==='');
+    payTestBk.status='Picked up';
+    assert('renderPaymentBlock shows once Picked up',renderPaymentBlock(payTestBk,'client').length>0);
+    assert('renderPaymentBlock shows once Completed',(()=>{payTestBk.status='Completed';const r=renderPaymentBlock(payTestBk,'client').length>0;payTestBk.status='Picked up';return r})());
+
+    // submitPayment validation
+    DB.bookings.push(payTestBk);
+    _paySelectMethod={};
+    submitPayment('BK-PAYTEST');
+    assert('submitPayment rejects with no method chosen',ensurePayment(payTestBk).status==='Unpaid');
+    selectPayMethod('BK-PAYTEST','mpesa');
+    submitPayment('BK-PAYTEST');
+    assert('submitPayment rejects M-Pesa with no reference entered',ensurePayment(payTestBk).status==='Unpaid');
+
+    // Cash requires no reference
+    selectPayMethod('BK-PAYTEST','cash');
+    submitPayment('BK-PAYTEST');
+    assert('Cash payment submits without needing a reference',ensurePayment(payTestBk).status==='Pending',`status=${ensurePayment(payTestBk).status}`);
+    assert('Submitted payment amount matches the booking fare',ensurePayment(payTestBk).amount===payTestBk.fare);
+    assert('clientSubmittedAt timestamp recorded',typeof ensurePayment(payTestBk).clientSubmittedAt==='number');
+
+    // Transporter confirms
+    confirmPaymentReceived('BK-PAYTEST');
+    assert('Confirming moves status to Confirmed',ensurePayment(payTestBk).status==='Confirmed');
+    assert('Receipt ID generated on confirmation',!!ensurePayment(payTestBk).receiptId);
+    assert('Receipt issued timestamp recorded',typeof ensurePayment(payTestBk).receiptIssuedAt==='number');
+    const receipt=receiptText(payTestBk);
+    assert('Receipt text includes the booking ID',receipt.includes('BK-PAYTEST'));
+    assert('Receipt text includes the confirmed amount',receipt.includes(String(payTestBk.fare)));
+    assert('confirmPaymentReceived is a no-op if nothing is Pending',(()=>{const before=ensurePayment(payTestBk).status;confirmPaymentReceived('BK-PAYTEST');return ensurePayment(payTestBk).status===before})());
+
+    // Cancellation blocked once payment confirmed
+    const origConfirm=window.confirm;window.confirm=()=>true; // auto-accept any confirm() dialog during this check
+    clCancelBooking('BK-PAYTEST');
+    assert('Booking cannot be cancelled once payment is Confirmed',payTestBk.status!=='Cancelled');
+    window.confirm=origConfirm;
+
+    // Dispute flow on a second test booking
+    const disputeBk={id:'BK-PAYTEST2',reqId:'REQ-0001',transporterId:'TR-JM01',transporterName:'John Mwangi Transport',transporterPhone:'0722100001',clientName:'Test Client 2',clientPhone:'0700000002',cargo:'Test cargo',distKm:5,fare:500,status:'Picked up',source:'instant',createdAt:now(),
+      payment:{status:'Unpaid',method:null,reference:null,amount:null,clientSubmittedAt:null,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null}};
+    DB.bookings.push(disputeBk);
+    disputeBk.payment.status='Pending';disputeBk.payment.method='airtel';disputeBk.payment.reference='WRONGCODE';disputeBk.payment.amount=disputeBk.fare;disputeBk.payment.clientSubmittedAt=now();
+    const origPrompt=window.prompt;window.prompt=()=>'Reference code does not match';
+    disputePayment('BK-PAYTEST2');
+    window.prompt=origPrompt;
+    assert('Disputing a pending payment sets status to Disputed',disputeBk.payment.status==='Disputed');
+    assert('Dispute reason recorded',disputeBk.payment.disputeReason==='Reference code does not match');
+    resubmitPayment('BK-PAYTEST2');
+    assert('resubmitPayment resets a disputed payment back to Unpaid',disputeBk.payment.status==='Unpaid');
+    disputeBk.payment.status='Disputed';disputeBk.payment.disputeReason='test';
+    const origConfirm2=window.confirm;window.confirm=()=>true;
+    resolveDispute('BK-PAYTEST2');
+    window.confirm=origConfirm2;
+    assert('Admin resolveDispute also resets a disputed payment to Unpaid',disputeBk.payment.status==='Unpaid');
+
+    // Cancellation still works normally when nothing has been confirmed
+    const origConfirm3=window.confirm;window.confirm=()=>true;
+    cancelBookingTr('BK-PAYTEST2');
+    window.confirm=origConfirm3;
+    assert('Unpaid/undisputed bookings can still be cancelled normally',disputeBk.status==='Cancelled');
+
+    // Admin confirmed-revenue KPI only counts Confirmed payments
+    const kpiTestBookings=[
+      {fare:1000,payment:{status:'Confirmed',amount:1000}},
+      {fare:2000,payment:{status:'Pending',amount:2000}},
+      {fare:3000,payment:{status:'Unpaid'}},
+    ];
+    const kpiSum=kpiTestBookings.filter(b=>b.payment?.status==='Confirmed').reduce((s,b)=>s+(b.payment.amount||b.fare),0);
+    assert('Confirmed-paid KPI only sums Confirmed-status bookings',kpiSum===1000);
+
+    // Cleanup
+    DB.bookings=DB.bookings.filter(b=>!['BK-PAYTEST','BK-PAYTEST2'].includes(b.id));
+    log('');
+
+    // [23] Vehicle list parity (client preference vs transporter registration)
+    log('[23] Vehicle list parity');
     const trVehicles=['Motorbike (boda)','Tuk Tuk','Pickup 1 ton','Canter 3 ton','Canter 5 ton','Lorry 10 ton','Flatbed 8 ton','Refrigerated van','Semi-trailer 30 ton'];
     const clVprefOptions=Array.from(document.querySelectorAll('#cl-vpref option')).map(o=>o.textContent).filter(t=>t!=='Any');
     assert('Client vehicle-preference list matches transporter registration list',trVehicles.every(v=>clVprefOptions.includes(v)),`${clVprefOptions.length}/${trVehicles.length} vehicles available`);
     assert('All floor rates cover every vehicle type',trVehicles.every(v=>DB.settings.floors[v]!==undefined));log('');
 
-    // [23] Demo data integrity (snapshot, cycle 0 only)
+    // [24] Demo data integrity (snapshot, cycle 0 only)
     if(cy===0){
-      log('[23] Demo data integrity');
+      log('[24] Demo data integrity');
       assert('9 user accounts',snap.users.length===9);
       assert('5 transporters',snap.transporters.length===5);
       assert('4 clients',snap.clients.length===4);
       assert('All transporters have userId',snap.transporters.every(t=>!!t.userId));
       assert('All clients have userId',snap.clients.every(c=>!!c.userId));
-      assert('7 requests',snap.requests.length===7);
-      assert('5 bids',snap.bids.length===5);
-      assert('2 bookings',snap.bookings.length===2);
+      assert('8 requests',snap.requests.length===8);
+      assert('4 bids',snap.bids.length===4);
+      assert('3 bookings',snap.bookings.length===3);
       assert('1 active booking',snap.bookings.filter(b=>b.status==='Active').length===1);
       assert('1 completed booking',snap.bookings.filter(b=>b.status==='Completed').length===1);
       assert('Open requests exist',snap.requests.filter(r=>r.status==='Open').length>=2);
@@ -1953,6 +2268,20 @@ async function runQA(stress=false){
       assert('Completed request exists',snap.requests.some(r=>r.status==='Completed'));
       assert('All bids have amounts > 0',snap.bids.every(b=>b.amount>0));
       assert('BID-0003 ≤ REQ-0003 maxFare',snap.bids.find(b=>b.id==='BID-0003')?.amount<=snap.requests.find(r=>r.id==='REQ-0003')?.maxFare);
+      assert('Every demo bid distance matches its request\\'s pickup→drop-off haul, not transporter proximity',snap.bids.every(b=>{
+        const req=snap.requests.find(r=>r.id===b.reqId);if(!req)return false;
+        const trueHaul=haulDistance(req);
+        return Math.abs(b.distKm-Math.round(trueHaul*10)/10)<0.15;
+      }));
+      assert('Every demo bid comes from a transporter with enough capacity for the job',snap.bids.every(b=>{
+        const req=snap.requests.find(r=>r.id===b.reqId);const tr=snap.transporters.find(t=>t.id===b.transporterId);
+        return req&&tr&&tr.capacityTons>=req.weightTons;
+      }));
+      assert('Every completed/active booking\\'s distance matches its request\\'s haul distance',snap.bookings.every(b=>{
+        const req=snap.requests.find(r=>r.id===b.reqId);if(!req)return true;
+        const trueHaul=haulDistance(req);
+        return Math.abs(b.distKm-Math.round(trueHaul*10)/10)<0.15;
+      }));
       assert('All demo PINs match hashPin(1234)',snap.users.every(u=>u.pinHash===hashPin('1234')));
       assert('No "free" word in demo messages',!snap.users.some(u=>u.name?.toLowerCase().includes('free')));log('');
     }
