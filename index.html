@@ -66,6 +66,13 @@ textarea{resize:vertical;min-height:52px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .fh{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.setup-steps{display:flex;flex-direction:column;gap:9px;margin-top:8px}
+.setup-step{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;line-height:1.5}
+.setup-n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--g);color:#fff;font-weight:700;font-size:11.5px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.health-row{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:4px 0}
+.health-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.health-dot.ok{background:#1a8f4c}
+.health-dot.bad{background:var(--r)}
 @media(max-width:560px){.row,.row3{grid-template-columns:1fr}}
 
 /* ═══ BUTTONS ═══════════════════════════════════════════════════ */
@@ -539,16 +546,31 @@ tr:hover td{background:var(--gl)}
 <div id="p-admin" class="panel">
   <h2>Operator</h2>
 
-  <!-- API URL -->
+  <!-- GOOGLE SHEET DATABASE SETUP -->
   <div class="card" style="border-left:4px solid var(--a)">
-    <h3>Google Sheet URL</h3>
-    <p>The URL your app reads and writes all data through. Update here if you redeploy.</p>
-    <div class="fh">
+    <h3>📊 Google Sheet database</h3>
+    <p>This app reads and writes every transporter, client, request, bid, booking, payment and message through one Google Sheet, so all devices see the same live data.</p>
+
+    <div id="sheet-setup-steps" class="setup-steps">
+      <div class="setup-step"><span class="setup-n">1</span><span>Open <strong>sheets.google.com</strong> → create a blank spreadsheet.</span></div>
+      <div class="setup-step"><span class="setup-n">2</span><span>Extensions → Apps Script. Delete any starter code, then paste in the full contents of <code>logistics-ke-backend.gs.txt</code> (provided alongside this app).</span></div>
+      <div class="setup-step"><span class="setup-n">3</span><span>Save the project. In the function dropdown pick <strong>initialSetup</strong>, click ▶ Run, and approve the permission prompt (it's your own script — safe to allow).</span></div>
+      <div class="setup-step"><span class="setup-n">4</span><span>Deploy → New deployment → gear icon → <strong>Web app</strong>. Set <em>Execute as: Me</em> and <em>Who has access: Anyone</em>. Click Deploy, then copy the URL ending in <code>/exec</code>.</span></div>
+      <div class="setup-step"><span class="setup-n">5</span><span>Paste that URL below and click <strong>Save &amp; test</strong>.</span></div>
+    </div>
+
+    <div class="alert alert-a" style="margin-top:10px">
+      <strong>Already set up before?</strong> Editing the script alone does <u>not</u> update the live URL. Every time the backend code changes, go to <strong>Deploy → Manage deployments</strong>, click the pencil on your existing deployment, and choose <strong>New version</strong> before clicking Deploy again — otherwise the app keeps talking to the old code.
+    </div>
+
+    <div class="fh" style="margin-top:12px">
       <div style="flex:1;min-width:200px"><input id="adm-api-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" style="font-size:12px"></div>
       <button class="btn btn-g btn-sm" id="api-save-btn" onclick="saveApiUrl()">Save & test</button>
-      <button class="btn btn-ghost btn-sm" onclick="resetApiUrl()">Reset</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetApiUrl()">Reset to built-in URL</button>
+      <button class="btn btn-ghost btn-sm" onclick="checkSheetHealth()">🩺 Check sheet health</button>
     </div>
     <div id="adm-url-status" style="margin-top:7px;font-size:12px"></div>
+    <div id="sheet-health" style="margin-top:8px"></div>
   </div>
 
   <div class="alert alert-g" id="sync-alert">Live · <span id="sync-detail">Connecting…</span></div>
@@ -1802,20 +1824,61 @@ async function saveApiUrl(){
   if(!val){statusEl.innerHTML='<span style="color:var(--r)">Enter a URL</span>';return}
   if(!val.startsWith('https://script.google.com/')){statusEl.innerHTML='<span style="color:var(--r)">URL must start with https://script.google.com/</span>';return}
   if(!val.endsWith('/exec')){statusEl.innerHTML='<span style="color:var(--r)">URL must end with /exec</span>';return}
-  API_URL=val;localStorage.setItem('lxke_api_url',val);
+  const previousUrl=API_URL;
+  API_URL=val;
   statusEl.innerHTML='Testing…';btnLoad('api-save-btn',true);
   try{
-    const r=await fetch(val+'?t='+now());const j=await r.json();
-    if(j&&j.ok){applyRemote(j.data);setSyncUI('on','Synced');statusEl.innerHTML='<span style="color:var(--g)">✓ Connected and working</span>';toast('URL saved')}
-    else throw new Error();
-  }catch(e){statusEl.innerHTML='<span style="color:var(--r)">⚠ Could not connect — check deployment settings</span>';setSyncUI('off','Error')}
-  btnLoad('api-save-btn',false);
+    const j=await fetchJSON(val+'?t='+now(),{},8000);
+    if(j&&j.ok){
+      localStorage.setItem('lxke_api_url',val);
+      applyRemote(j.data);setSyncUI('on','Synced');
+      statusEl.innerHTML='<span style="color:var(--g)">✓ Connected and working</span>';
+      toast('URL saved');
+    } else {
+      throw new Error('bad response');
+    }
+  }catch(e){
+    API_URL=previousUrl; // don't leave the app pointed at a URL that just failed to connect
+    statusEl.innerHTML=e.name==='AbortError'
+      ?'<span style="color:var(--r)">⚠ Timed out — the URL did not respond within 8s</span>'
+      :'<span style="color:var(--r)">⚠ Could not connect — check the deployment is set to "Anyone" and the URL ends in /exec</span>';
+    setSyncUI('off','Error');
+  }finally{
+    btnLoad('api-save-btn',false);
+  }
 }
 
 function resetApiUrl(){
   API_URL=API_URL_DEFAULT;localStorage.removeItem('lxke_api_url');
   const urlIn=G('adm-api-url');if(urlIn)urlIn.value=API_URL_DEFAULT;
   G('adm-url-status').innerHTML='<span style="color:var(--muted)">Reset to default</span>';toast('URL reset');
+}
+
+// Diagnostic tool: fetches the live backend and reports, sheet by sheet, whether
+// each one the app expects is actually present and how many rows it holds. This
+// is the fastest way to tell whether a deployed Apps Script is running an old
+// version of the backend code (e.g. missing the Users sheet added later) versus
+// a genuine connection problem.
+const EXPECTED_SHEETS=['users','transporters','clients','requests','bids','bookings','messages'];
+async function checkSheetHealth(){
+  const el=G('sheet-health');
+  el.innerHTML='<div class="health-row"><span class="health-dot"></span>Checking…</div>';
+  try{
+    const j=await fetchJSON(API_URL+'?t='+now(),{},8000);
+    if(!j||!j.ok){el.innerHTML='<div class="alert alert-r">Backend responded but reported an error. Check the Apps Script logs (View → Executions).</div>';return}
+    const rows=EXPECTED_SHEETS.map(name=>{
+      const present=Array.isArray(j.data?.[name]);
+      const count=present?j.data[name].length:0;
+      return `<div class="health-row"><span class="health-dot ${present?'ok':'bad'}"></span><strong style="text-transform:capitalize">${name}</strong> — ${present?`${count} row${count!==1?'s':''}`:'sheet missing — your deployed script is out of date, redeploy a new version'}</div>`;
+    }).join('');
+    const allPresent=EXPECTED_SHEETS.every(name=>Array.isArray(j.data?.[name]));
+    el.innerHTML=`<div class="${allPresent?'alert alert-g':'alert alert-a'}" style="flex-direction:column;align-items:stretch;gap:2px">
+      <div style="font-weight:600;margin-bottom:4px">${allPresent?'✓ All 7 sheets present and reachable':'⚠ Some sheets are missing — see below'}</div>
+      ${rows}
+    </div>`;
+  }catch(e){
+    el.innerHTML=`<div class="alert alert-r">Could not reach the backend${e.name==='AbortError'?' (timed out after 8s)':''}. Check the URL and that the deployment access is set to "Anyone".</div>`;
+  }
 }
 
 async function resetAll(){
@@ -1914,7 +1977,7 @@ function demoLogin(phone){
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   QA TEST SUITE — 25 groups, 120 assertions
+   QA TEST SUITE — 26 groups, 125 assertions
 ═══════════════════════════════════════════════════════════════════ */
 async function runQA(stress=false){
   const LOG=G('qa-log'),SUM=G('qa-summary');LOG.innerHTML='';SUM.innerHTML='';
@@ -2295,9 +2358,35 @@ async function runQA(stress=false){
     ['su','li'].forEach(pfx=>[0,1,2,3].forEach(i=>{const b=G(pfx+'-p'+i);if(b){b.value='';b.classList.remove('pin-err')}}));
     log('');
 
-    // [25] Demo data integrity (snapshot, cycle 0 only)
+    // [25] Backend wiring — frontend/backend contract consistency
+    log('[25] Backend wiring consistency');
+    assert('EXPECTED_SHEETS has exactly the 7 sheets the backend creates',EXPECTED_SHEETS.length===7);
+    assert('Every entity the app posts has a matching expected sheet',
+      ['Bid','Booking','Client','Message','Request','Transporter','User'].every(e=>EXPECTED_SHEETS.includes(e.toLowerCase()+'s')));
+    assert('API_URL_DEFAULT is a valid Apps Script /exec URL',API_URL_DEFAULT.startsWith('https://script.google.com/')&&API_URL_DEFAULT.endsWith('/exec'));
+    assert('saveApiUrl uses the timeout-protected fetchJSON, not raw fetch',(()=>{const src=saveApiUrl.toString();return src.includes('fetchJSON')&&!src.includes('await fetch(')})());
+    assert('checkSheetHealth is defined and callable',typeof checkSheetHealth==='function');
+
+    // Live connectivity report — informational only. A network hiccup here reflects
+    // the environment this QA run happens in, not a code defect, so it is logged
+    // rather than failed. When you run this in your browser it checks your real Sheet.
+    try{
+      const liveCheck=await fetchJSON(API_URL+'?t='+now(),{},6000);
+      if(liveCheck&&liveCheck.ok){
+        const missing=EXPECTED_SHEETS.filter(s=>!Array.isArray(liveCheck.data?.[s]));
+        if(missing.length===0)log(`  ℹ Live check: connected — all 7 sheets present on the deployed backend`,'p');
+        else log(`  ⚠ Live check: connected, but missing sheet(s): ${missing.join(', ')} — redeploy a new version of the backend script`,'f');
+      } else {
+        log('  ℹ Live check: backend reachable but returned an unexpected response','w');
+      }
+    }catch(e){
+      log(`  ℹ Live check: could not reach the configured backend right now (${e.name==='AbortError'?'timed out':'network error'}) — this does not fail the suite`,'w');
+    }
+    log('');
+
+    // [26] Demo data integrity (snapshot, cycle 0 only)
     if(cy===0){
-      log('[25] Demo data integrity');
+      log('[26] Demo data integrity');
       assert('9 user accounts',snap.users.length===9);
       assert('5 transporters',snap.transporters.length===5);
       assert('4 clients',snap.clients.length===4);
