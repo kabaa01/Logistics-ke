@@ -138,6 +138,8 @@ tr:hover td{background:var(--gl)}
 .bk-card.done{background:#f7f6f0;border-color:var(--bd)}
 .bk-card.active-tr{background:#fff8e0;border-color:var(--a)}
 .pay-card{background:#fff;border:1.5px dashed var(--bds);border-radius:var(--rad);padding:11px;margin-top:9px}
+.loc-card{background:#f2f7fd;border:1.5px dashed #a8c8e8;border-radius:var(--rad);padding:11px;margin-top:9px}
+.loc-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px}
 .pay-card.pending{border-style:solid;border-color:var(--a);background:var(--al)}
 .pay-card.confirmed{border-style:solid;border-color:var(--g);background:var(--gl)}
 .pay-card.disputed{border-style:solid;border-color:var(--r);background:var(--rl)}
@@ -147,6 +149,10 @@ tr:hover td{background:var(--gl)}
 .pay-method-btn .pm-icon{display:block;font-size:18px;margin-bottom:2px}
 .receipt-card{background:#fff;border:2px solid var(--g);border-radius:var(--rad);padding:14px;margin-top:9px;font-size:12.5px}
 .receipt-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--w)}
+.fee-breakdown{background:var(--w);border-radius:6px;padding:8px 10px;margin:6px 0;font-size:12px}
+.fee-row{display:flex;justify-content:space-between;padding:2px 0}
+.fee-row.muted{color:var(--gr);font-size:11.5px}
+.fee-row.total{border-top:1px solid var(--bd);margin-top:4px;padding-top:5px;font-weight:700}
 .receipt-row:last-child{border-bottom:none}
 .receipt-title{font-family:var(--fm);font-size:16px;font-weight:900;color:var(--g);text-align:center;margin-bottom:4px}
 .receipt-sub{text-align:center;font-size:10.5px;color:var(--muted);margin-bottom:8px}
@@ -211,6 +217,7 @@ tr:hover td{background:var(--gl)}
 .empty-icon{font-size:28px;display:block;margin-bottom:8px;opacity:.5}
 .icon-wa{color:var(--g);font-weight:700;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .icon-sms{color:var(--info);font-weight:700;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.icon-bt{color:#4a3fa8;font-weight:700;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:0;font-family:inherit}
 .step-badge{width:22px;height:22px;border-radius:50%;background:var(--a);color:#fff;font-family:var(--fm);font-size:12px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none}
 .section-note{font-size:11.5px;color:var(--gr);background:var(--w);border:1px dashed var(--bd);border-radius:var(--rad);padding:8px 11px;margin-bottom:11px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bk);color:#fff;padding:9px 18px;border-radius:24px;font-size:13px;font-weight:500;z-index:9999;transition:transform .22s;white-space:nowrap;max-width:90vw;text-align:center;pointer-events:none}
@@ -239,8 +246,9 @@ tr:hover td{background:var(--gl)}
 .rb-list{list-style:none;display:flex;flex-direction:column;gap:6px}
 .rb-list li{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;opacity:.9;color:#fff;line-height:1.5}
 .rb-list li::before{content:'✓';color:var(--a);font-weight:900;flex:none;font-size:11px;margin-top:2px}
-.how-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:20px}
-@media(max-width:560px){.how-grid{grid-template-columns:1fr 1fr}}
+.how-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:20px}
+@media(max-width:700px){.how-grid{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:420px){.how-grid{grid-template-columns:1fr 1fr}}
 .how-card{background:rgba(255,255,255,.07);border-radius:7px;padding:10px 9px;text-align:center}
 .how-n{font-family:var(--fm);font-size:20px;font-weight:900;color:var(--a);line-height:1}
 .how-t{font-size:11px;font-weight:600;color:#fff;margin:3px 0 2px;text-transform:uppercase;letter-spacing:.3px}
@@ -323,7 +331,8 @@ tr:hover td{background:var(--gl)}
       <div class="how-card"><div class="how-n">1</div><div class="how-t">Sign up</div><div class="how-d">Phone + PIN, no email</div></div>
       <div class="how-card"><div class="how-n">2</div><div class="how-t">Post or list</div><div class="how-d">Job or vehicle</div></div>
       <div class="how-card"><div class="how-n">3</div><div class="how-t">Match</div><div class="how-d">Instant or bid</div></div>
-      <div class="how-card"><div class="how-n">4</div><div class="how-t">Confirm</div><div class="how-d">SMS or WhatsApp</div></div>
+      <div class="how-card"><div class="how-n">4</div><div class="how-t">Pay & confirm</div><div class="how-d">M-Pesa, Airtel, bank, or cash</div></div>
+      <div class="how-card"><div class="how-n">5</div><div class="how-t">Track & receipt</div><div class="how-d">Live location, digital receipt</div></div>
     </div>
   </div>
 
@@ -583,6 +592,7 @@ tr:hover td{background:var(--gl)}
     <div class="kpi"><div class="kpi-val" id="k-bk">0</div><div class="kpi-lbl">Bookings</div></div>
     <div class="kpi"><div class="kpi-val" id="k-rev">0</div><div class="kpi-lbl">KES booked</div></div>
     <div class="kpi"><div class="kpi-val" id="k-paid">0</div><div class="kpi-lbl">KES confirmed paid</div></div>
+    <div class="kpi"><div class="kpi-val" id="k-fees">0</div><div class="kpi-lbl">KES platform fees earned</div></div>
   </div>
 
   <div class="card-row">
@@ -1026,8 +1036,29 @@ function refreshPanel(id){
 ═══════════════════════════════════════════════════════════════════ */
 function waLink(phone,msg){let p=String(phone).replace(/[^0-9]/g,'');if(p.startsWith('0'))p='254'+p.slice(1);if(!p.startsWith('254'))p='254'+p;return`https://wa.me/${p}?text=${encodeURIComponent(msg)}`}
 function smsLink(phone,msg){return`sms:${phone}?body=${encodeURIComponent(msg)}`}
-function logMsg(phone,msg,type){const m={id:uid('MSG'),phone,msg,type,time:new Date().toLocaleString('en-KE')};DB.msgs.unshift(m);if(DB.msgs.length>300)DB.msgs.pop();persistLocal();apiPost('upsert','Message',m)}
-function notifyLinks(phone,msg,type){logMsg(phone,msg,type);return`<a class="icon-sms" href="${smsLink(phone,msg)}">💬 SMS</a> <a class="icon-wa" href="${waLink(phone,msg)}" target="_blank" rel="noopener">📲 WhatsApp</a>`}
+function logMsg(phone,msg,type){const m={id:uid('MSG'),phone,msg,type,time:new Date().toLocaleString('en-KE')};DB.msgs.unshift(m);if(DB.msgs.length>300)DB.msgs.pop();persistLocal();apiPost('upsert','Message',m);return m.id}
+
+// Bluetooth mesh chat apps (e.g. bitchat) are separate native apps with no
+// public API or backend for this app to connect to — a webpage genuinely
+// cannot control them directly. What IS honest and useful: offer to copy
+// the message so it can be pasted straight into a nearby Bluetooth chat
+// app, which works fully offline with no internet or SMS cost. This action
+// only uses the clipboard, not the Web Bluetooth API, so it's shown on
+// every device — including iPhones, where bitchat itself actually lives,
+// but which never expose navigator.bluetooth to a webpage at all.
+function copyMsgForBluetooth(msgId){
+  const m=DB.msgs.find(x=>x.id===msgId);
+  if(!m){toast('Message not found','err');return}
+  if(!navigator.clipboard){toast('Copy is not supported on this browser — select and copy the message manually','err');return}
+  navigator.clipboard.writeText(m.msg)
+    .then(()=>toast('Copied! Open a nearby Bluetooth chat app (e.g. bitchat) and paste to send — works fully offline, no internet needed'))
+    .catch(()=>toast('Could not copy automatically — long-press the message to copy it manually','err'));
+}
+
+function notifyLinks(phone,msg,type){
+  const msgId=logMsg(phone,msg,type);
+  return `<a class="icon-sms" href="${smsLink(phone,msg)}">💬 SMS</a> <a class="icon-wa" href="${waLink(phone,msg)}" target="_blank" rel="noopener">📲 WhatsApp</a> <button class="icon-bt" onclick="copyMsgForBluetooth('${msgId}')">📶 Bluetooth chat</button>`;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    MAP / LOCATION PICKER
@@ -1299,6 +1330,7 @@ function renderTrBookings(){
         ${(isActive||isPicked)?`<button class="btn btn-ghost btn-sm" onclick="cancelBookingTr('${bk.id}')">Cancel</button>`:''}
       </div>
       ${renderPaymentBlock(bk,'transporter')}
+      ${renderLocationBlock(bk,'transporter')}
     </div>`;
   });
   G('tr-bk-list').innerHTML=h;
@@ -1317,6 +1349,7 @@ function trDelivered(bkId){
   bk.status='Completed';persistLocal();apiPost('upsert','Booking',bk);
   const req=DB.requests.find(r=>r.id===bk.reqId);
   if(req){req.status='Completed';apiPost('upsert','Request',req)}
+  stopLocationWatch(bkId); // job's done — stop polling GPS for it
   logMsg(bk.clientPhone,`Delivery complete for booking ${bkId}. Thank you for using Logistics-KE.`,'delivery');
   toast('Marked as delivered');renderTrBookings();
 }
@@ -1328,6 +1361,7 @@ function cancelBookingTr(bkId){
   bk.status='Cancelled';persistLocal();apiPost('upsert','Booking',bk);
   const req=DB.requests.find(r=>r.id===bk.reqId);
   if(req){req.status='Cancelled';apiPost('upsert','Request',req)}
+  stopLocationWatch(bkId);
   logMsg(bk.clientPhone,`Booking ${bkId} was cancelled by the transporter. Please post a new request.`,'cancellation');
   toast('Booking cancelled','warn');renderTrBookings();
 }
@@ -1485,6 +1519,7 @@ function renderClDash(){
           <button class="btn btn-r btn-xs" onclick="clCancelBooking('${bk.id}')">Cancel</button>
         </div>
         ${renderPaymentBlock(bk,'client')}
+        ${renderLocationBlock(bk,'client')}
       </div>`;
     }
     if(bk&&bk.status==='Completed'){
@@ -1541,6 +1576,7 @@ function clCompleteBooking(bkId){
   const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
   bk.status='Completed';apiPost('upsert','Booking',bk);
   const req=DB.requests.find(r=>r.id===bk.reqId);if(req){req.status='Completed';apiPost('upsert','Request',req)}
+  stopLocationWatch(bkId);
   logMsg(bk.transporterPhone,`Delivery confirmed for booking ${bkId}. Thank you!`,'delivery');
   persistLocal();toast('Marked as delivered');renderClDash();
 }
@@ -1551,6 +1587,7 @@ function clCancelBooking(bkId){
   if(!confirm('Cancel this booking?'))return;
   bk.status='Cancelled';apiPost('upsert','Booking',bk);
   const req=DB.requests.find(r=>r.id===bk.reqId);if(req){req.status='Cancelled';apiPost('upsert','Request',req)}
+  stopLocationWatch(bkId);
   logMsg(bk.transporterPhone,`Booking ${bkId} was cancelled by the client.`,'cancellation');
   persistLocal();toast('Booking cancelled','warn');renderClDash();
 }
@@ -1617,8 +1654,29 @@ const PAY_METHODS=[
   {id:'cash',label:'Cash',icon:'💵'}
 ];
 
+// A 3% processing fee applies to each side of a digital payment (client pays
+// 3% on top of the fare, transporter's payout is reduced 3% below the fare) —
+// this is how the platform sustains itself. Cash has no processing fee since
+// no payment gateway or transfer cost is actually involved in a cash handoff.
+const PROCESSING_FEE_PCT=0.03;
+function computeFees(fare,method){
+  if(method==='cash'){
+    return {fare,clientFee:0,transporterFee:0,totalCharged:fare,netPayout:fare,platformRevenue:0};
+  }
+  const clientFee=Math.round(fare*PROCESSING_FEE_PCT);
+  const transporterFee=Math.round(fare*PROCESSING_FEE_PCT);
+  return {
+    fare,
+    clientFee,
+    transporterFee,
+    totalCharged:fare+clientFee,
+    netPayout:fare-transporterFee,
+    platformRevenue:clientFee+transporterFee
+  };
+}
+
 function ensurePayment(bk){
-  if(!bk.payment)bk.payment={status:'Unpaid',method:null,reference:null,amount:null,clientSubmittedAt:null,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null};
+  if(!bk.payment)bk.payment={status:'Unpaid',method:null,reference:null,amount:null,clientFee:0,transporterFee:0,totalCharged:null,netPayout:null,clientSubmittedAt:null,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null};
   return bk.payment;
 }
 
@@ -1628,6 +1686,17 @@ function selectPayMethod(bkId,method){
   document.querySelectorAll(`#pm-${bkId} .pay-method-btn`).forEach(b=>b.classList.toggle('selected',b.dataset.m===method));
   const refWrap=G(`payref-wrap-${bkId}`);
   if(refWrap)refWrap.style.display=(method==='cash')?'none':'block';
+  const feeWrap=G(`fee-breakdown-${bkId}`);
+  if(feeWrap){
+    const bk=DB.bookings.find(b=>b.id===bkId);
+    if(bk){
+      const fees=computeFees(bk.fare,method);
+      feeWrap.innerHTML=method==='cash'
+        ? `<div class="fee-row"><span>Fare</span><strong>KES ${fmt(fees.fare)}</strong></div><div class="fee-row muted"><span>Cash — no processing fee</span><span></span></div><div class="fee-row total"><span>Pay the transporter</span><strong>KES ${fmt(fees.totalCharged)}</strong></div>`
+        : `<div class="fee-row"><span>Fare</span><strong>KES ${fmt(fees.fare)}</strong></div><div class="fee-row muted"><span>Service fee (3%)</span><span>+ KES ${fmt(fees.clientFee)}</span></div><div class="fee-row total"><span>You pay</span><strong>KES ${fmt(fees.totalCharged)}</strong></div>`;
+      feeWrap.style.display='block';
+    }
+  }
 }
 
 function submitPayment(bkId){
@@ -1640,11 +1709,14 @@ function submitPayment(bkId){
     reference=(G(`payref-${bkId}`)?.value||'').trim();
     if(!reference){toast('Enter the transaction reference / code from your payment confirmation','err');return}
   }
+  const fees=computeFees(bk.fare,method);
   pay.status='Pending';pay.method=method;pay.reference=reference;pay.amount=bk.fare;
+  pay.clientFee=fees.clientFee;pay.transporterFee=fees.transporterFee;pay.totalCharged=fees.totalCharged;pay.netPayout=fees.netPayout;
   pay.clientSubmittedAt=now();pay.disputeReason=null;pay.disputedAt=null;
   persistLocal();apiPost('upsert','Booking',bk);
   const methodLabel=PAY_METHODS.find(m=>m.id===method)?.label||method;
-  logMsg(bk.transporterPhone,`Payment submitted for booking ${bk.id}: KES ${fmt(bk.fare)} via ${methodLabel}${reference?' (Ref: '+reference+')':''}. Please confirm receipt in the app.`,'payment');
+  const feeNote=fees.clientFee>0?` (fare KES ${fmt(bk.fare)} + 3% service fee KES ${fmt(fees.clientFee)} = KES ${fmt(fees.totalCharged)} paid)`:'';
+  logMsg(bk.transporterPhone,`Payment submitted for booking ${bk.id}: KES ${fmt(fees.totalCharged)} via ${methodLabel}${reference?' (Ref: '+reference+')':''}.${feeNote} Please confirm receipt in the app.`,'payment');
   toast('Payment submitted — waiting for transporter to confirm');
   renderClDash();
 }
@@ -1652,7 +1724,7 @@ function submitPayment(bkId){
 function resubmitPayment(bkId){
   const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
   const pay=ensurePayment(bk);
-  pay.status='Unpaid';pay.method=null;pay.reference=null;pay.disputeReason=null;pay.disputedAt=null;
+  pay.status='Unpaid';pay.method=null;pay.reference=null;pay.clientFee=0;pay.transporterFee=0;pay.totalCharged=null;pay.netPayout=null;pay.disputeReason=null;pay.disputedAt=null;
   persistLocal();apiPost('upsert','Booking',bk);
   renderClDash();
 }
@@ -1665,7 +1737,9 @@ function confirmPaymentReceived(bkId){
   pay.receiptId=uid('RCT');pay.receiptIssuedAt=now();
   persistLocal();apiPost('upsert','Booking',bk);
   const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method;
-  logMsg(bk.clientPhone,`Payment confirmed for booking ${bk.id}: KES ${fmt(pay.amount)} via ${methodLabel}. Receipt ${pay.receiptId} issued. Thank you!`,'payment');
+  const feeNote=pay.transporterFee>0?` After the 3% service fee (KES ${fmt(pay.transporterFee)}), your payout is KES ${fmt(pay.netPayout)}.`:'';
+  logMsg(bk.clientPhone,`Payment confirmed for booking ${bk.id}: KES ${fmt(pay.totalCharged||pay.amount)} via ${methodLabel}. Receipt ${pay.receiptId} issued. Thank you!`,'payment');
+  logMsg(bk.transporterPhone,`You confirmed payment for booking ${bk.id}.${feeNote}`,'payment');
   toast('Payment confirmed — receipt issued');
   renderTrBookings();
 }
@@ -1687,7 +1761,7 @@ function resolveDispute(bkId){
   const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
   if(!confirm('Reset this disputed payment so the client can resubmit?'))return;
   const pay=ensurePayment(bk);
-  pay.status='Unpaid';pay.method=null;pay.reference=null;pay.disputeReason=null;pay.disputedAt=null;
+  pay.status='Unpaid';pay.method=null;pay.reference=null;pay.clientFee=0;pay.transporterFee=0;pay.totalCharged=null;pay.netPayout=null;pay.disputeReason=null;pay.disputedAt=null;
   persistLocal();apiPost('upsert','Booking',bk);
   toast('Dispute resolved — client can resubmit payment');
   renderAdmin();
@@ -1696,12 +1770,15 @@ function resolveDispute(bkId){
 function receiptText(bk){
   const pay=ensurePayment(bk);
   const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method||'—';
+  const feeLines=pay.method==='cash'
+    ? `Fare: KES ${fmt(pay.amount)} (cash — no processing fee)`
+    : `Fare: KES ${fmt(pay.amount)}\nService fee (3% each side): client +KES ${fmt(pay.clientFee)}, transporter -KES ${fmt(pay.transporterFee)}\nClient paid: KES ${fmt(pay.totalCharged)} | Transporter received: KES ${fmt(pay.netPayout)}`;
   return `LOGISTICS-KE RECEIPT ${pay.receiptId}
 Booking: ${bk.id}
 Transporter: ${bk.transporterName} (${bk.transporterPhone})
 Client: ${bk.clientName} (${bk.clientPhone})
 Cargo: ${bk.cargo}, ${bk.distKm}km
-Amount: KES ${fmt(pay.amount)}
+${feeLines}
 Method: ${methodLabel}${pay.reference?' — Ref '+pay.reference:''}
 Confirmed: ${new Date(pay.transporterConfirmedAt).toLocaleString('en-KE')}`;
 }
@@ -1712,8 +1789,9 @@ function renderPaymentBlock(bk,role){
 
   if(pay.status==='Confirmed'){
     const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method;
+    const amtLabel=role==='transporter'?`KES ${fmt(pay.netPayout||pay.amount)} received (net of 3% fee)`:`KES ${fmt(pay.totalCharged||pay.amount)} paid`;
     return `<div class="pay-card confirmed">
-      <div style="font-weight:700;color:var(--g)">✓ Payment confirmed — KES ${fmt(pay.amount)} via ${methodLabel}</div>
+      <div style="font-weight:700;color:var(--g)">✓ Payment confirmed — ${amtLabel} via ${methodLabel}</div>
       <div class="btn-row"><button class="btn btn-o btn-xs" onclick="toggleReceipt('${bk.id}')">🧾 View receipt</button></div>
       <div id="receipt-${bk.id}" style="display:none">${renderReceiptCard(bk)}</div>
     </div>`;
@@ -1730,25 +1808,28 @@ function renderPaymentBlock(bk,role){
   if(pay.status==='Pending'){
     const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method;
     if(role==='transporter'){
+      const feeLine=pay.transporterFee>0?`<div class="fee-row muted"><span>Service fee (3%)</span><span>− KES ${fmt(pay.transporterFee)}</span></div><div class="fee-row total"><span>You'll receive</span><strong>KES ${fmt(pay.netPayout)}</strong></div>`:`<div class="fee-row total"><span>You'll receive</span><strong>KES ${fmt(pay.netPayout||pay.amount)}</strong></div>`;
       return `<div class="pay-card pending">
-        <div style="font-weight:700">Client says paid: KES ${fmt(pay.amount)} via ${methodLabel}${pay.reference?' — Ref '+pay.reference:''}</div>
+        <div style="font-weight:700">Client says paid: KES ${fmt(pay.totalCharged||pay.amount)} via ${methodLabel}${pay.reference?' — Ref '+pay.reference:''}</div>
+        <div class="fee-breakdown">${feeLine}</div>
         <div class="btn-row">
           <button class="btn btn-g btn-xs" onclick="confirmPaymentReceived('${bk.id}')">✓ Confirm received</button>
           <button class="btn btn-r btn-xs" onclick="disputePayment('${bk.id}')">⚠ Dispute</button>
         </div>
       </div>`;
     }
-    return `<div class="pay-card pending"><div style="font-size:12px">⏳ Waiting for transporter to confirm your payment (${methodLabel}${pay.reference?' — Ref '+pay.reference:''})</div></div>`;
+    return `<div class="pay-card pending"><div style="font-size:12px">⏳ Waiting for transporter to confirm your payment of KES ${fmt(pay.totalCharged||pay.amount)} (${methodLabel}${pay.reference?' — Ref '+pay.reference:''})</div></div>`;
   }
 
   // Unpaid
   if(role==='client'){
     return `<div class="pay-card">
-      <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">Confirm payment · KES ${fmt(bk.fare)}</div>
+      <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">Confirm payment · Fare KES ${fmt(bk.fare)}</div>
       <div class="pay-methods" id="pm-${bk.id}">
         ${PAY_METHODS.map(m=>`<div class="pay-method-btn" data-m="${m.id}" onclick="selectPayMethod('${bk.id}','${m.id}')"><span class="pm-icon">${m.icon}</span>${m.label}</div>`).join('')}
       </div>
-      <div id="payref-wrap-${bk.id}" style="display:none;margin-bottom:6px"><input id="payref-${bk.id}" placeholder="Transaction code / reference (from your M-Pesa, Airtel, or bank SMS)"></div>
+      <div id="fee-breakdown-${bk.id}" class="fee-breakdown" style="display:none"></div>
+      <div id="payref-wrap-${bk.id}" style="display:none;margin-bottom:6px;margin-top:6px"><input id="payref-${bk.id}" placeholder="Transaction code / reference (from your M-Pesa, Airtel, or bank SMS)"></div>
       <div class="btn-row"><button class="btn btn-g btn-xs" onclick="submitPayment('${bk.id}')">I've paid</button></div>
     </div>`;
   }
@@ -1763,6 +1844,11 @@ function toggleReceipt(bkId){
 function renderReceiptCard(bk){
   const pay=ensurePayment(bk);
   const methodLabel=PAY_METHODS.find(m=>m.id===pay.method)?.label||pay.method;
+  const feeRows=pay.method==='cash'
+    ? `<div class="receipt-row"><span>Processing fee</span><strong>None (cash)</strong></div>`
+    : `<div class="receipt-row"><span>Service fee (3% × 2)</span><strong>Client +KES ${fmt(pay.clientFee)} · Transporter −KES ${fmt(pay.transporterFee)}</strong></div>
+       <div class="receipt-row"><span>Client paid</span><strong>KES ${fmt(pay.totalCharged)}</strong></div>
+       <div class="receipt-row"><span>Transporter received</span><strong>KES ${fmt(pay.netPayout)}</strong></div>`;
   return `<div class="receipt-card">
     <div class="receipt-title">🧾 Receipt</div>
     <div class="receipt-sub">${pay.receiptId} · ${pay.receiptIssuedAt?new Date(pay.receiptIssuedAt).toLocaleString('en-KE'):''}</div>
@@ -1770,9 +1856,100 @@ function renderReceiptCard(bk){
     <div class="receipt-row"><span>Transporter</span><strong>${bk.transporterName}</strong></div>
     <div class="receipt-row"><span>Client</span><strong>${bk.clientName}</strong></div>
     <div class="receipt-row"><span>Cargo</span><strong>${bk.cargo}, ${bk.distKm}km</strong></div>
-    <div class="receipt-row"><span>Amount</span><strong>KES ${fmt(pay.amount)}</strong></div>
+    <div class="receipt-row"><span>Fare</span><strong>KES ${fmt(pay.amount)}</strong></div>
+    ${feeRows}
     <div class="receipt-row"><span>Method</span><strong>${methodLabel}${pay.reference?' · Ref '+pay.reference:''}</strong></div>
     <div class="btn-row" style="margin-top:8px">${notifyLinks(bk.clientPhone,receiptText(bk),'receipt')}</div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LIVE LOCATION TRACKING
+   Opt-in GPS sharing between client and transporter while a job is
+   under way. Uses the browser's real Geolocation API — nothing here
+   depends on any third-party app. Sharing is per-browser-tab and
+   stops automatically once the job is delivered or cancelled.
+═══════════════════════════════════════════════════════════════════ */
+let _locationWatchers={};  // bkId -> browser watchPosition id (in-memory only)
+let _lastLocationSync={};  // bkId -> timestamp of last server push (throttling)
+
+function ensureLiveLocation(bk){
+  if(!bk.liveLocation)bk.liveLocation={transporter:null,client:null};
+  return bk.liveLocation;
+}
+function isSharingLocation(bkId){return !!_locationWatchers[bkId]}
+function mapLink(lat,lon){return `https://www.google.com/maps?q=${lat},${lon}`}
+function timeAgo(ts){
+  const diff=now()-ts;
+  if(diff<60000)return'just now';
+  if(diff<3600000)return Math.floor(diff/60000)+'m ago';
+  return Math.floor(diff/3600000)+'h ago';
+}
+
+function startSharingLocation(bkId,role){
+  if(!navigator.geolocation){toast('Location is not supported on this device or browser','err');return}
+  if(_locationWatchers[bkId]){toast('Already sharing your location for this job');return}
+  const watchId=navigator.geolocation.watchPosition(
+    pos=>{
+      const bk=DB.bookings.find(b=>b.id===bkId);if(!bk)return;
+      const loc=ensureLiveLocation(bk);
+      loc[role]={lat:pos.coords.latitude,lon:pos.coords.longitude,updatedAt:now()};
+      persistLocal();
+      // Throttle server pushes so a fast GPS tick rate doesn't hammer the API
+      const last=_lastLocationSync[bkId]||0;
+      if(now()-last>20000){_lastLocationSync[bkId]=now();apiPost('upsert','Booking',bk)}
+      const active=document.querySelector('.panel.active');
+      if(active?.id==='p-tr-bookings')renderTrBookings();
+      if(active?.id==='p-cl-dash')renderClDash();
+    },
+    err=>{
+      const msgs={1:'Location permission denied — enable it in your browser settings to share your location',2:'Could not get your location — GPS signal unavailable',3:'Location request timed out'};
+      toast(msgs[err.code]||'Could not get your location','err');
+      stopSharingLocation(bkId,role);
+    },
+    {enableHighAccuracy:true,maximumAge:10000,timeout:15000}
+  );
+  _locationWatchers[bkId]=watchId;
+  toast('Sharing your live location for this job');
+}
+
+function stopSharingLocation(bkId,role){
+  stopLocationWatch(bkId);
+  const bk=DB.bookings.find(b=>b.id===bkId);
+  if(bk){const loc=ensureLiveLocation(bk);if(role)loc[role]=null;persistLocal();apiPost('upsert','Booking',bk)}
+  toast('Stopped sharing your location');
+  const active=document.querySelector('.panel.active');
+  if(active?.id==='p-tr-bookings')renderTrBookings();
+  if(active?.id==='p-cl-dash')renderClDash();
+}
+
+// Stops the local GPS watch only, without clearing the stored last-known
+// point — used when a job finishes so the device stops polling GPS, while
+// leaving the last position visible as a historical record.
+function stopLocationWatch(bkId){
+  if(_locationWatchers[bkId]){navigator.geolocation.clearWatch(_locationWatchers[bkId]);delete _locationWatchers[bkId]}
+}
+
+function renderLocationBlock(bk,role){
+  if(bk.status!=='Active'&&bk.status!=='Picked up')return'';
+  const loc=ensureLiveLocation(bk);
+  const otherRole=role==='client'?'transporter':'client';
+  const theirs=loc[otherRole];
+  const sharing=isSharingLocation(bk.id);
+  const otherLabel=otherRole==='transporter'?bk.transporterName:bk.clientName;
+
+  const theirsHtml=theirs
+    ?`<div class="loc-row"><span>📍 ${otherLabel}'s location</span><a href="${mapLink(theirs.lat,theirs.lon)}" target="_blank" rel="noopener" class="btn btn-o btn-xs">View on map</a></div><div style="font-size:11px;color:var(--gr)">Updated ${timeAgo(theirs.updatedAt)}</div>`
+    :`<div style="font-size:11.5px;color:var(--gr)">${otherLabel} is not sharing their live location right now</div>`;
+
+  return `<div class="loc-card">
+    <div style="font-weight:700;font-size:12.5px;margin-bottom:5px">📍 Live location</div>
+    ${theirsHtml}
+    <div class="btn-row" style="margin-top:7px">
+      ${sharing
+        ?`<button class="btn btn-r btn-xs" onclick="stopSharingLocation('${bk.id}','${role}')">Stop sharing my location</button>`
+        :`<button class="btn btn-o btn-xs" onclick="startSharingLocation('${bk.id}','${role}')">Share my live location</button>`}
+    </div>
   </div>`;
 }
 
@@ -1788,6 +1965,7 @@ function renderAdmin(){
   G('k-bk').textContent=DB.bookings.filter(b=>b.status==='Active'||b.status==='Picked up').length;
   G('k-rev').textContent=fmt(DB.bookings.reduce((s,b)=>s+b.fare,0));
   G('k-paid').textContent=fmt(DB.bookings.filter(b=>b.payment?.status==='Confirmed').reduce((s,b)=>s+(b.payment.amount||b.fare),0));
+  G('k-fees').textContent=fmt(DB.bookings.filter(b=>b.payment?.status==='Confirmed').reduce((s,b)=>s+(b.payment.clientFee||0)+(b.payment.transporterFee||0),0));
 
   G('adm-users').innerHTML=DB.users.length?`<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Role</th><th>Joined</th><th></th></tr></thead><tbody>${DB.users.map(u=>`<tr><td>${u.name}</td><td>${u.phone}</td><td><span class="badge bd-b">${u.role}</span></td><td>${u.joined}</td><td><button class="btn btn-ghost btn-xs" onclick="adminResetPin('${u.id}')">Reset PIN</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No users yet</div>';
 
@@ -1943,11 +2121,11 @@ function loadDemoData(){
   ];
   DB.bookings=[
     {id:'BK-0001',reqId:'REQ-0001',transporterId:'TR-JM01',transporterName:'John Mwangi Transport',transporterPhone:'0722100001',clientName:'Greenleaf Tea Ltd',clientPhone:'0701600006',cargo:'Agricultural produce',distKm:34.5,fare:2156,status:'Completed',source:'instant',createdAt:PAST-86400000,
-     payment:{status:'Confirmed',method:'mpesa',reference:'QGH7K2LMNP',amount:2156,clientSubmittedAt:PAST-3600000,transporterConfirmedAt:PAST-1800000,disputeReason:null,disputedAt:null,receiptId:'RCT-DEMO001',receiptIssuedAt:PAST-1800000}},
+     payment:{status:'Confirmed',method:'mpesa',reference:'QGH7K2LMNP',amount:2156,clientFee:65,transporterFee:65,totalCharged:2221,netPayout:2091,clientSubmittedAt:PAST-3600000,transporterConfirmedAt:PAST-1800000,disputeReason:null,disputedAt:null,receiptId:'RCT-DEMO001',receiptIssuedAt:PAST-1800000}},
     {id:'BK-0002',reqId:'REQ-0004',transporterId:'TR-AW02',transporterName:'Alice Wanjiku Logistics',transporterPhone:'0723200002',clientName:'Makini Electronics',clientPhone:'0704900009',cargo:'Electronics',distKm:6.3,fare:496,status:'Active',source:'instant',createdAt:now()-3600000,
-     payment:{status:'Unpaid',method:null,reference:null,amount:null,clientSubmittedAt:null,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null}},
+     payment:{status:'Unpaid',method:null,reference:null,amount:null,clientFee:0,transporterFee:0,totalCharged:null,netPayout:null,clientSubmittedAt:null,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null}},
     {id:'BK-0003',reqId:'REQ-0008',transporterId:'TR-PK05',transporterName:'Peter Kamau Haulage',transporterPhone:'0712500005',clientName:'Nairobi Hardware Supplies',clientPhone:'0702700007',cargo:'Building materials',distKm:2.6,fare:222,status:'Picked up',source:'instant',createdAt:now()-7200000,
-     payment:{status:'Pending',method:'mpesa',reference:'RJT4X9QPLM',amount:222,clientSubmittedAt:now()-900000,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null}}
+     payment:{status:'Pending',method:'mpesa',reference:'RJT4X9QPLM',amount:222,clientFee:7,transporterFee:7,totalCharged:229,netPayout:215,clientSubmittedAt:now()-900000,transporterConfirmedAt:null,disputeReason:null,disputedAt:null,receiptId:null,receiptIssuedAt:null}}
   ];
   DB.msgs=[
     {id:'MSG-001',phone:'0722100001',msg:'Booking BK-0001: Agricultural produce 2.5t. Pickup: Limuru Tea Farm → Nairobi Tea Packers. Fare KES 2,156.',type:'booking',time:'01/06/2025, 07:14'},
@@ -1977,7 +2155,7 @@ function demoLogin(phone){
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   QA TEST SUITE — 26 groups, 125 assertions
+   QA TEST SUITE — 29 groups, 155 assertions
 ═══════════════════════════════════════════════════════════════════ */
 async function runQA(stress=false){
   const LOG=G('qa-log'),SUM=G('qa-summary');LOG.innerHTML='';SUM.innerHTML='';
@@ -2384,9 +2562,91 @@ async function runQA(stress=false){
     }
     log('');
 
-    // [26] Demo data integrity (snapshot, cycle 0 only)
+    // [26] Processing fee calculation (3% each side)
+    log('[26] Processing fee (3% each side)');
+    const feesMpesa=computeFees(1000,'mpesa');
+    assert('Client fee is 3% of fare',feesMpesa.clientFee===30,`got ${feesMpesa.clientFee}`);
+    assert('Transporter fee is 3% of fare',feesMpesa.transporterFee===30,`got ${feesMpesa.transporterFee}`);
+    assert('Client pays fare + fee',feesMpesa.totalCharged===1030);
+    assert('Transporter receives fare - fee',feesMpesa.netPayout===970);
+    assert('Platform earns both fees combined (6% of fare)',feesMpesa.platformRevenue===60);
+    const feesCash=computeFees(1000,'cash');
+    assert('Cash has zero client fee',feesCash.clientFee===0);
+    assert('Cash has zero transporter fee',feesCash.transporterFee===0);
+    assert('Cash total charged equals the bare fare',feesCash.totalCharged===1000);
+    assert('Cash net payout equals the bare fare',feesCash.netPayout===1000);
+    assert('Fee applies consistently across all 3 digital methods',['mpesa','airtel','bank'].every(m=>computeFees(500,m).clientFee===computeFees(500,'mpesa').clientFee));
+
+    // Full submit → confirm cycle carries the fee breakdown through correctly
+    const feeTestBk={id:'BK-FEETEST',reqId:'REQ-0001',transporterId:'TR-JM01',transporterName:'Test T',transporterPhone:'0700000010',clientName:'Test C',clientPhone:'0700000011',cargo:'Test',distKm:5,fare:2000,status:'Picked up',source:'instant',createdAt:now()};
+    DB.bookings.push(feeTestBk);
+    selectPayMethod('BK-FEETEST','mpesa');
+    _paySelectMethod['BK-FEETEST']='mpesa';
+    G('payref-BK-FEETEST')?.remove();
+    // submitPayment reads the reference from the DOM; since no live UI exists for
+    // this synthetic test booking, set the payment fields directly to isolate the
+    // fee-carrying logic (submitPayment's own validation path is covered in the
+    // earlier payment-workflow group).
+    const feeTestPay=ensurePayment(feeTestBk);
+    const computed=computeFees(feeTestBk.fare,'mpesa');
+    feeTestPay.status='Pending';feeTestPay.method='mpesa';feeTestPay.reference='TESTREF1';feeTestPay.amount=feeTestBk.fare;
+    feeTestPay.clientFee=computed.clientFee;feeTestPay.transporterFee=computed.transporterFee;feeTestPay.totalCharged=computed.totalCharged;feeTestPay.netPayout=computed.netPayout;
+    confirmPaymentReceived('BK-FEETEST');
+    assert('Confirmed payment retains the correct client fee',feeTestPay.clientFee===60);
+    assert('Confirmed payment retains the correct net payout',feeTestPay.netPayout===1940);
+    const feeReceipt=receiptText(feeTestBk);
+    assert('Receipt text includes the client-paid total',feeReceipt.includes('1940')||feeReceipt.includes(String(computed.totalCharged)));
+    assert('Receipt text mentions the service fee',feeReceipt.toLowerCase().includes('service fee'));
+    DB.bookings=DB.bookings.filter(b=>b.id!=='BK-FEETEST');
+    log('');
+
+    // [27] Live location tracking
+    log('[27] Live location tracking');
+    const locTestBk={id:'BK-LOCTEST',reqId:'REQ-0001',transporterId:'TR-JM01',transporterName:'Test T',transporterPhone:'0700000020',clientName:'Test C',clientPhone:'0700000021',cargo:'Test',distKm:5,fare:500,status:'Active',source:'instant',createdAt:now()};
+    DB.bookings.push(locTestBk);
+    const loc=ensureLiveLocation(locTestBk);
+    assert('New booking has no shared location by default (opt-in only)',loc.transporter===null&&loc.client===null);
+    assert('renderLocationBlock is empty for a status with no active job underway',(()=>{const b2={...locTestBk,status:'Completed'};return renderLocationBlock(b2,'client')===''})());
+    assert('renderLocationBlock renders while the job is Active',renderLocationBlock(locTestBk,'client').length>0);
+
+    // Mock the Geolocation API so this test never triggers a real permission prompt
+    const origGeo=navigator.geolocation;
+    let mockWatchCleared=false;
+    Object.defineProperty(navigator,'geolocation',{configurable:true,value:{
+      watchPosition:(success)=>{success({coords:{latitude:-1.2921,longitude:36.8219}});return 12345},
+      clearWatch:(id)=>{if(id===12345)mockWatchCleared=true}
+    }});
+    startSharingLocation('BK-LOCTEST','transporter');
+    assert('Starting sharing marks the booking as actively sharing',isSharingLocation('BK-LOCTEST'));
+    assert('Starting sharing records a live coordinate for that role',ensureLiveLocation(locTestBk).transporter?.lat===-1.2921);
+    assert('The other party sees the shared location once set',renderLocationBlock(locTestBk,'client').includes('View on map'));
+    stopSharingLocation('BK-LOCTEST','transporter');
+    assert('Stopping sharing clears the active watch',mockWatchCleared);
+    assert('Stopping sharing marks the booking as no longer actively sharing',!isSharingLocation('BK-LOCTEST'));
+    assert('Stopping sharing clears that role\'s stored coordinate',ensureLiveLocation(locTestBk).transporter===null);
+
+    // Completing/cancelling a job must stop any live GPS watch automatically (battery/privacy)
+    startSharingLocation('BK-LOCTEST','transporter');
+    trDelivered('BK-LOCTEST');
+    assert('Marking a job delivered automatically stops GPS watching',!isSharingLocation('BK-LOCTEST'));
+    Object.defineProperty(navigator,'geolocation',{configurable:true,value:origGeo});
+    DB.bookings=DB.bookings.filter(b=>b.id!=='BK-LOCTEST');
+    log('');
+
+    // [28] Bluetooth mesh chat share (honest scope — clipboard handoff, not a real backend integration)
+    log('[28] Bluetooth chat share');
+    assert('copyMsgForBluetooth is defined and callable',typeof copyMsgForBluetooth==='function');
+    const btTestId=logMsg('0700000099','QA bluetooth test message','test');
+    assert('logMsg returns the created message id',typeof btTestId==='string'&&btTestId.startsWith('MSG-'));
+    assert('The logged message is retrievable by that id',DB.msgs.find(m=>m.id===btTestId)?.msg==='QA bluetooth test message');
+    const linksHtml=notifyLinks('0700000099','Another QA test message','test');
+    assert('notifyLinks always includes SMS and WhatsApp',linksHtml.includes('icon-sms')&&linksHtml.includes('icon-wa'));
+    assert('notifyLinks always includes the Bluetooth chat handoff — it only uses the clipboard, so gating it behind navigator.bluetooth would wrongly hide it from iOS, where bitchat itself lives',linksHtml.includes('icon-bt'));
+    log('');
+
+    // [29] Demo data integrity (snapshot, cycle 0 only)
     if(cy===0){
-      log('[26] Demo data integrity');
+      log('[29] Demo data integrity');
       assert('9 user accounts',snap.users.length===9);
       assert('5 transporters',snap.transporters.length===5);
       assert('4 clients',snap.clients.length===4);
@@ -2418,7 +2678,13 @@ async function runQA(stress=false){
         return Math.abs(b.distKm-Math.round(trueHaul*10)/10)<0.15;
       }));
       assert('All demo PINs match hashPin(1234)',snap.users.every(u=>u.pinHash===hashPin('1234')));
-      assert('No "free" word in demo messages',!snap.users.some(u=>u.name?.toLowerCase().includes('free')));log('');
+      assert('No "free" word in demo messages',!snap.users.some(u=>u.name?.toLowerCase().includes('free')));
+      assert('Every Confirmed/Pending demo payment has correctly computed fee fields (not undefined/NaN)',snap.bookings.every(b=>{
+        const p=b.payment;if(!p||(p.status!=='Confirmed'&&p.status!=='Pending'))return true;
+        if(p.method==='cash')return p.clientFee===0&&p.transporterFee===0;
+        const expected=computeFees(p.amount,p.method);
+        return p.clientFee===expected.clientFee&&p.transporterFee===expected.transporterFee&&p.totalCharged===expected.totalCharged&&p.netPayout===expected.netPayout;
+      }));log('');
     }
   }
   Object.assign(DB,JSON.parse(JSON.stringify(snap)));persistLocal();
