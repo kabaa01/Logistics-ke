@@ -43,6 +43,7 @@ code{background:#f0ede6;padding:1px 5px;border-radius:3px;font-size:11.5px}
 .user-avat{width:24px;height:24px;border-radius:50%;background:var(--a);color:#fff;font-family:var(--fm);font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center}
 .user-pill button{background:none;border:none;color:rgba(255,255,255,.65);cursor:pointer;font-size:10.5px;font-family:var(--fb);font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:0;margin-left:2px}
 .user-pill button:hover{color:#fff}
+.role-badge{background:var(--a);color:#fff;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:10px}
 
 /* ═══ TABS ══════════════════════════════════════════════════════ */
 .tabs{background:#181818;display:flex;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid #2a2a2a}
@@ -411,6 +412,8 @@ tr:hover td{background:var(--gl)}
     <div class="user-pill">
       <div class="user-avat" id="user-avat">?</div>
       <span id="user-label">…</span>
+      <span class="role-badge" id="role-badge"></span>
+      <button id="switch-role-btn" onclick="switchRole()" title="Switch between Transporter and Client mode">⇄ Switch</button>
       <button onclick="logOut()">Out</button>
     </div>
   </div>
@@ -1007,12 +1010,65 @@ function bootApp(){
   const n=SESSION.name||'';
   G('user-label').textContent=n.split(' ')[0]||SESSION.role;
   G('user-avat').textContent=n.slice(0,2).toUpperCase()||'?';
+  const badge=G('role-badge'),switchBtn=G('switch-role-btn');
+  if(SESSION.role==='admin'){
+    if(badge)badge.style.display='none';
+    if(switchBtn)switchBtn.style.display='none';
+  } else {
+    if(badge){badge.style.display='inline-block';badge.textContent=SESSION.role==='transporter'?'Transporter':'Client'}
+    if(switchBtn)switchBtn.style.display='inline';
+  }
   const tabs=NAV[SESSION.role]||NAV.client;
   G('tabbar').innerHTML=tabs.map(t=>`<button class="tb" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.l}</button>`).join('');
   const first=tabs[0].id;
   switchTab(SESSION.role==='transporter'&&SESSION.transporterId===null?'tr-profile':first);
   if(_syncInterval)clearInterval(_syncInterval); // prevent stacking duplicate timers across repeated logins in the same tab
   _syncInterval=setInterval(()=>{if(SESSION)apiFetch()},6000);
+}
+
+// Lets a signed-in transporter or client switch which mode they're using.
+// Existing profile data for either role is never deleted — a transporter
+// who switches to client mode and later switches back finds their vehicle,
+// rate, and location exactly as they left them, because every lookup in
+// this app resolves by SESSION.userId, never by the role label itself.
+function switchRole(){
+  if(!SESSION||SESSION.role==='admin')return;
+  const currentRole=SESSION.role;
+  const newRole=currentRole==='transporter'?'client':'transporter';
+
+  // Don't let a transporter switch away while a job is actually under way —
+  // the "Picked up" / "Delivered" controls live only in transporter mode,
+  // so leaving mid-job would strand that booking with no way to progress it.
+  if(currentRole==='transporter'){
+    const tr=myTr();
+    const activeJob=tr&&DB.bookings.some(b=>b.transporterId===tr.id&&(b.status==='Active'||b.status==='Picked up'));
+    if(activeJob){
+      alert('You have a job in progress. Finish or hand it off before switching to Client mode, so it doesn\'t get stranded.');
+      return;
+    }
+  }
+
+  const roleLabel=newRole==='transporter'?'Transporter':'Client';
+  const hasExisting=newRole==='transporter'
+    ?DB.transporters.some(t=>t.userId===SESSION.userId)
+    :DB.clients.some(c=>c.userId===SESSION.userId);
+  const msg=hasExisting
+    ?`Switch to ${roleLabel} mode? Your existing ${roleLabel.toLowerCase()} profile is still there exactly as you left it.`
+    :`Switch to ${roleLabel} mode? ${newRole==='transporter'?"You'll be asked to set up your vehicle details.":"You can post your first job right away."}`;
+  if(!confirm(msg))return;
+
+  const user=DB.users.find(u=>u.id===SESSION.userId);
+  if(!user){toast('Could not find your account — try logging in again','err');return}
+  user.role=newRole;
+  persistLocal();apiPost('upsert','User',user);
+
+  SESSION.role=newRole;
+  SESSION.transporterId=DB.transporters.find(t=>t.userId===SESSION.userId)?.id||null;
+  SESSION.clientId=DB.clients.find(c=>c.userId===SESSION.userId)?.id||null;
+  sv('session',SESSION);
+
+  toast(`Switched to ${roleLabel} mode`);
+  bootApp();
 }
 
 function switchTab(id){
@@ -2155,7 +2211,7 @@ function demoLogin(phone){
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   QA TEST SUITE — 29 groups, 155 assertions
+   QA TEST SUITE — 30 groups, 165 assertions
 ═══════════════════════════════════════════════════════════════════ */
 async function runQA(stress=false){
   const LOG=G('qa-log'),SUM=G('qa-summary');LOG.innerHTML='';SUM.innerHTML='';
@@ -2644,9 +2700,56 @@ async function runQA(stress=false){
     assert('notifyLinks always includes the Bluetooth chat handoff — it only uses the clipboard, so gating it behind navigator.bluetooth would wrongly hide it from iOS, where bitchat itself lives',linksHtml.includes('icon-bt'));
     log('');
 
-    // [29] Demo data integrity (snapshot, cycle 0 only)
+    // [29] Switch role (transporter ⇄ client)
+    log('[29] Switch role');
+    const origSession=SESSION; // switchRole no-ops for admin, so we must test as a non-admin session
+    const swUserId='USR-SWTEST';
+    DB.users.push({id:swUserId,name:'QA Switch Test',phone:'0700000030',role:'client',pinHash:hashPin('1234'),joined:today()});
+    SESSION={userId:swUserId,role:'client',name:'QA Switch Test',phone:'0700000030',transporterId:null,clientId:null};
+
+    const origConfirmSW=window.confirm;window.confirm=()=>true;
+    switchRole();
+    assert('Switching from client sets role to transporter',SESSION.role==='transporter');
+    assert('The user record\'s role is updated to match',DB.users.find(u=>u.id===swUserId)?.role==='transporter');
+    assert('No transporter profile exists yet, so transporterId is null (drives the "set up profile" redirect)',SESSION.transporterId===null);
+
+    // Give this synthetic user a transporter profile, then switch away and back
+    DB.transporters.push({id:'TR-SWTEST',userId:swUserId,name:'QA Switch Test',phone:'0700000030',vehicle:'Pickup 1 ton',capacityTons:1,ratePerKm:40,baseLat:-1.29,baseLon:36.82,baseAddr:'Test',baseComment:'',network:'safaricom',pref:'both',status:'Active',joined:today()});
+    switchRole(); // transporter -> client
+    assert('Switching from transporter (no active job) succeeds',SESSION.role==='client');
+    assert('The transporter profile is NOT deleted when switching away',DB.transporters.some(t=>t.id==='TR-SWTEST'));
+    switchRole(); // client -> transporter again
+    assert('Switching back to transporter re-links the SAME existing profile, not a new one',SESSION.transporterId==='TR-SWTEST');
+    assert('Exactly one transporter profile exists for this user (no duplicate created)',DB.transporters.filter(t=>t.userId===swUserId).length===1);
+    window.confirm=origConfirmSW;
+
+    // Active-job guard: must not be able to switch away mid-delivery
+    const swBooking={id:'BK-SWTEST',reqId:'REQ-0001',transporterId:'TR-SWTEST',transporterName:'QA Switch Test',transporterPhone:'0700000030',clientName:'X',clientPhone:'0700000031',cargo:'Test',distKm:1,fare:100,status:'Picked up',source:'instant',createdAt:now()};
+    DB.bookings.push(swBooking);
+    let alertCalled=false;
+    const origAlertSW=window.alert;window.alert=()=>{alertCalled=true};
+    switchRole();
+    window.alert=origAlertSW;
+    assert('Switching away is blocked while a job is Active/Picked up',SESSION.role==='transporter');
+    assert('The user is warned via alert() rather than failing silently',alertCalled);
+    DB.bookings=DB.bookings.filter(b=>b.id!=='BK-SWTEST');
+
+    // Admin guard
+    const savedRole=SESSION.role;SESSION.role='admin';
+    switchRole();
+    assert('switchRole is a no-op for an admin session',SESSION.role==='admin');
+    SESSION.role=savedRole;
+
+    // Cleanup
+    DB.users=DB.users.filter(u=>u.id!==swUserId);
+    DB.transporters=DB.transporters.filter(t=>t.id!=='TR-SWTEST');
+    SESSION=origSession;
+    bootApp(); // restore the real admin header/tab state — the test above left it showing the synthetic session
+    log('');
+
+    // [30] Demo data integrity (snapshot, cycle 0 only)
     if(cy===0){
-      log('[29] Demo data integrity');
+      log('[30] Demo data integrity');
       assert('9 user accounts',snap.users.length===9);
       assert('5 transporters',snap.transporters.length===5);
       assert('4 clients',snap.clients.length===4);
