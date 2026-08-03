@@ -537,7 +537,7 @@ tr:hover td{background:var(--gl)}
       <div class="row3">
         <div class="fg"><label>Bid window</label><select id="cl-window"><option value="900">15 min</option><option value="1800" selected>30 min</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select></div>
         <div class="fg"><label>Max budget (KES)</label><input id="cl-maxfare" type="number" min="1" placeholder="No limit"></div>
-        <div class="fg"><label>Preferred vehicle</label><select id="cl-vpref"><option value="">Any</option><option>Motorbike (boda)</option><option>Tuk Tuk</option><option>Pickup 1 ton</option><option>Canter 3 ton</option><option>Canter 5 ton</option><option>Lorry 10 ton</option><option>Flatbed 8 ton</option><option>Refrigerated van</option><option>Semi-trailer 30 ton</option></select></div>
+        <div class="fg"><label>Preferred vehicle</label><select id="cl-vpref"><option value="">Any</option></select></div>
       </div>
     </div>
     <div class="btn-row"><button class="btn btn-g" id="post-btn" onclick="postRequest()">📤 Post job</button></div>
@@ -674,6 +674,29 @@ const API_URL_DEFAULT='https://script.google.com/macros/s/AKfycbw4pUjyUwDpeB27UO
 let API_URL=localStorage.getItem('lxke_api_url')||API_URL_DEFAULT;
 const ADMIN_SECRET='LKADMIN2025';
 
+// Single source of truth for every vehicle class used across the app —
+// registration, capacity auto-fill, floor rates, and the client's preferred-
+// vehicle filter all derive from this one list instead of four separate
+// hardcoded copies that previously had to be kept in sync by hand (and had
+// already drifted out of sync once before). capacityTons is the typical
+// payload for that class in Kenya's commercial transport sector — a sensible
+// starting point the transporter can adjust for their specific vehicle.
+// floorPerKm is the minimum sustainable RFQ bid rate for that class.
+const VEHICLES=[
+  {name:'Motorbike (boda)',   capacityTons:0.05, floorPerKm:25},
+  {name:'Tuk Tuk',            capacityTons:0.3,  floorPerKm:30},
+  {name:'Pickup 1 ton',       capacityTons:1,    floorPerKm:40},
+  {name:'Canter 3 ton',       capacityTons:3,    floorPerKm:45},
+  {name:'Canter 5 ton',       capacityTons:5,    floorPerKm:50},
+  {name:'Flatbed 8 ton',      capacityTons:8,    floorPerKm:60},
+  {name:'Lorry 10 ton',       capacityTons:10,   floorPerKm:65},
+  {name:'Refrigerated van',   capacityTons:2,    floorPerKm:80},
+  {name:'Semi-trailer 30 ton',capacityTons:30,   floorPerKm:90},
+];
+const VEHICLE_NAMES=VEHICLES.map(v=>v.name);
+function vehicleCapacity(name){return VEHICLES.find(v=>v.name===name)?.capacityTons??''}
+function vehicleFloor(name){return VEHICLES.find(v=>v.name===name)?.floorPerKm??0}
+
 /* ═══════════════════════════════════════════════════════════════════
    UTILS
 ═══════════════════════════════════════════════════════════════════ */
@@ -692,6 +715,24 @@ function sv(k,v){try{localStorage.setItem('lxke_'+k,JSON.stringify(v))}catch(e){
 function lv(k,d){try{const v=localStorage.getItem('lxke_'+k);return v?JSON.parse(v):d}catch(e){return d}}
 function normalizePhone(p){return p.replace(/[^0-9]/g,'')}
 function hashPin(pin){let h=5381;for(let i=0;i<pin.length;i++){h=((h<<5)+h)+pin.charCodeAt(i);h=h&h}return Math.abs(h).toString(36)}
+
+// Best-effort SMS network detection from Kenya's public numbering plan
+// (Communications Authority of Kenya prefix allocations). Mobile number
+// portability means someone can carry their number to a different network,
+// so this is only ever used as an editable pre-selected suggestion — never
+// a hard requirement — and returns null rather than guessing when a prefix
+// isn't one we're confident about.
+function detectNetwork(phone){
+  const p=normalizePhone(phone);
+  const local=p.startsWith('254')?'0'+p.slice(3):p; // accept 2547... or 07... either way
+  const p3=local.slice(0,3),p4=local.slice(0,4);
+  if(['070','071','072','074','079'].includes(p3))return 'safaricom';
+  if(['0110','0111','0112','0113','0114','0115'].includes(p4))return 'safaricom';
+  if(['073','075'].includes(p3))return 'airtel';
+  if(['0100','0101','0102'].includes(p4))return 'airtel';
+  if(p3==='077')return 'telkom';
+  return null; // unrecognised prefix — let the person choose, don't guess
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    TOAST
@@ -716,7 +757,7 @@ let DB={
   msgs:lv('msgs',[]),
   settings:lv('settings',{
     radiusKm:35,maxBookings:3,counterPct:10,
-    floors:{'Motorbike (boda)':25,'Tuk Tuk':30,'Pickup 1 ton':40,'Canter 3 ton':45,'Canter 5 ton':50,'Lorry 10 ton':65,'Flatbed 8 ton':60,'Refrigerated van':80,'Semi-trailer 30 ton':90}
+    floors:Object.fromEntries(VEHICLES.map(v=>[v.name,v.floorPerKm]))
   })
 };
 function persistLocal(){['users','transporters','clients','requests','bids','bookings','msgs','settings'].forEach(k=>sv(k,DB[k]))}
@@ -1217,27 +1258,36 @@ function myTr(){return DB.transporters.find(t=>t.userId===SESSION?.userId)}
 
 function renderTrProfile(){
   const tr=myTr();
-  const vehicles=['Motorbike (boda)','Tuk Tuk','Pickup 1 ton','Canter 3 ton','Canter 5 ton','Lorry 10 ton','Flatbed 8 ton','Refrigerated van','Semi-trailer 30 ton'];
+  // Auto-detect network from the phone number given at signup — but only as
+  // the starting suggestion for a brand-new profile. Once someone has saved
+  // a network choice, we always respect it and never silently override it.
+  const suggestedNet=tr?.network||detectNetwork(SESSION.phone)||'safaricom';
   G('tr-edit-form').innerHTML=`
   <div class="card">
     <h3>${tr?'Update profile':'Set up your profile'}</h3>
     <p>${tr?'Changes go live immediately.':'Add your vehicle details so clients can find you.'}</p>
     <div class="row3">
-      <div class="fg"><label>Vehicle</label><select id="tr-veh">${vehicles.map(v=>`<option${tr?.vehicle===v?' selected':''}>${v}</option>`).join('')}</select></div>
-      <div class="fg"><label>Capacity (tons)</label><input id="tr-cap" type="number" step="0.1" min="0.05" value="${tr?.capacityTons||''}" placeholder="e.g. 1.5"></div>
-      <div class="fg"><label>Rate (KES/km)</label><input id="tr-rate" type="number" min="1" value="${tr?.ratePerKm||''}" placeholder="e.g. 50"></div>
+      <div class="fg"><label>Vehicle</label><select id="tr-veh" onchange="autoFillVehicleDefaults()">${VEHICLE_NAMES.map(v=>`<option${tr?.vehicle===v?' selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="fg"><label>Capacity (tons)</label><input id="tr-cap" type="number" step="0.1" min="0.05" value="${tr?.capacityTons??vehicleCapacity(VEHICLE_NAMES[0])}" placeholder="e.g. 1.5">
+        <small id="tr-cap-hint" style="color:var(--muted)">Auto-filled for this vehicle — adjust if yours differs</small></div>
+      <div class="fg"><label>Rate (KES/km)</label><input id="tr-rate" type="number" min="1" value="${tr?.ratePerKm||''}" placeholder="e.g. 50">
+        <small id="tr-rate-hint" style="color:var(--muted)"></small></div>
     </div>
     <div class="row">
       <div class="fg"><label>SMS network</label><select id="tr-net">
-        <option value="safaricom"${tr?.network==='safaricom'?' selected':''}>Safaricom</option>
-        <option value="airtel"${tr?.network==='airtel'?' selected':''}>Airtel Kenya</option>
-        <option value="telkom"${tr?.network==='telkom'?' selected':''}>Telkom Kenya</option>
-      </select></div>
+        <option value="safaricom"${suggestedNet==='safaricom'?' selected':''}>Safaricom</option>
+        <option value="airtel"${suggestedNet==='airtel'?' selected':''}>Airtel Kenya</option>
+        <option value="telkom"${suggestedNet==='telkom'?' selected':''}>Telkom Kenya</option>
+      </select>${!tr&&detectNetwork(SESSION.phone)?`<small style="color:var(--muted)">Detected from your number — change it if you've ported networks</small>`:''}</div>
       <div class="fg"><label>Job preference</label><select id="tr-pref">
         <option value="both"${!tr||tr.pref==='both'?' selected':''}>Instant + quotes</option>
         <option value="instant"${tr?.pref==='instant'?' selected':''}>Instant only</option>
         <option value="rfq"${tr?.pref==='rfq'?' selected':''}>Quotes only</option>
       </select></div>
+    </div>
+    <div class="fg">
+      <label>Number plate <small>(optional — helps clients recognise your vehicle)</small></label>
+      <input id="tr-plate" value="${tr?.plate||''}" placeholder="e.g. KDA 245B" style="text-transform:uppercase">
     </div>
     <div class="fg">
       <label>Base location <small>— clients near here see your profile</small></label>
@@ -1261,6 +1311,24 @@ function renderTrProfile(){
       ${tr?`<button class="btn btn-ghost btn-sm" onclick="switchTab('tr-dash')">Cancel</button>`:''}
     </div>
   </div>`;
+  updateRateHint();
+}
+
+// Selecting a vehicle auto-fills its typical Kenyan commercial capacity —
+// the person can still edit it for their specific unit — and refreshes the
+// rate suggestion below the rate field so new transporters aren't left
+// guessing what to charge.
+function autoFillVehicleDefaults(){
+  const veh=G('tr-veh').value;
+  G('tr-cap').value=vehicleCapacity(veh);
+  updateRateHint();
+}
+
+function updateRateHint(){
+  const veh=G('tr-veh')?.value;if(!veh)return;
+  const floor=vehicleFloor(veh);
+  const hint=G('tr-rate-hint');if(!hint)return;
+  hint.textContent=`Typical range for this vehicle: KES ${floor}–${Math.round(floor*1.6)}/km (floor is KES ${floor}/km)`;
 }
 
 function saveTrProfile(){
@@ -1276,6 +1344,7 @@ function saveTrProfile(){
   const tr={id:ex?.id||uid('TR'),userId:SESSION.userId,name:SESSION.name,phone:SESSION.phone,
     vehicle:veh,capacityTons:cap,ratePerKm:rate,baseLat:lat,baseLon:lon,
     baseAddr:G('lp-tr-addr')?.textContent||'',baseComment:G('tr-comment').value||'',
+    plate:G('tr-plate').value.trim().toUpperCase()||'',
     network:G('tr-net').value,pref:G('tr-pref').value,status:'Active',joined:ex?.joined||today()};
   if(ex)Object.assign(ex,tr);else DB.transporters.push(tr);
   SESSION.transporterId=tr.id;sv('session',SESSION);
@@ -1299,7 +1368,7 @@ function renderTrDash(){
     <div style="width:40px;height:40px;border-radius:50%;background:var(--g);color:#fff;font-family:var(--fm);font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none">${tr.name.slice(0,2).toUpperCase()}</div>
     <div style="flex:1;min-width:0">
       <div style="font-family:var(--fm);font-size:16px;font-weight:700">${tr.name}</div>
-      <div style="font-size:11.5px;color:var(--muted)">${tr.vehicle} · ${tr.capacityTons}t · KES ${tr.ratePerKm}/km${tr.baseAddr?' · '+tr.baseAddr:''}</div>
+      <div style="font-size:11.5px;color:var(--muted)">${tr.vehicle} · ${tr.capacityTons}t · KES ${tr.ratePerKm}/km${tr.plate?' · 🔖 '+tr.plate:''}${tr.baseAddr?' · '+tr.baseAddr:''}</div>
       ${tr.baseComment?`<div style="font-size:11px;color:var(--g2)">💬 ${tr.baseComment}</div>`:''}
     </div>
     <div style="display:flex;gap:14px">
@@ -1661,7 +1730,7 @@ function renderTransporterBrowse(){
       <div class="tr-avat">${t.name.slice(0,2).toUpperCase()}</div>
       <div class="tr-info">
         <div class="tr-name">${t.name}</div>
-        <div class="tr-sub">${t.vehicle} · ${t.capacityTons}t · KES ${t.ratePerKm}/km</div>
+        <div class="tr-sub">${t.vehicle} · ${t.capacityTons}t · KES ${t.ratePerKm}/km${t.plate?' · 🔖 '+t.plate:''}</div>
         ${t.baseAddr?`<div class="tr-sub">📍 ${t.baseAddr}</div>`:''}
         ${t.baseComment?`<div class="tr-sub" style="font-style:italic;color:var(--g2)">💬 ${t.baseComment}</div>`:''}
         <div class="tr-stats">
@@ -1687,7 +1756,8 @@ function createBooking(req,tr,dist,fare,source){
   DB.bookings.push(bk);req.status='Booked';persistLocal();
   apiPost('upsert','Booking',bk);apiPost('upsert','Request',req);
   const locMsg=req.pickupAddr?`Pickup: ${req.pickupAddr}${req.pickupComment?' ('+req.pickupComment+')':''}. Drop-off: ${req.dropoffAddr||''}${req.dropoffComment?' ('+req.dropoffComment+')':''}.`:`Pickup: ${req.pickupLat?.toFixed(4)},${req.pickupLon?.toFixed(4)}.`;
-  const msg=`Booking ${bk.id}: ${req.cargoType} ${req.weightTons}t. ${locMsg} Fare: KES ${fmt(bk.fare)}.`;
+  const vehicleMsg=tr.plate?` Vehicle: ${tr.vehicle} (${tr.plate}).`:'';
+  const msg=`Booking ${bk.id}: ${req.cargoType} ${req.weightTons}t. ${locMsg}${vehicleMsg} Fare: KES ${fmt(bk.fare)}.`;
   logMsg(tr.phone,msg,'booking');logMsg(req.clientPhone,msg,'booking');
   return bk;
 }
@@ -2146,11 +2216,11 @@ function loadDemoData(){
     {id:'USR-ME09',name:'Makini Electronics',phone:'0704900009',role:'client',pinHash:PIN,joined:'2025-03-01'}
   ];
   DB.transporters=[
-    {id:'TR-JM01',userId:'USR-JM01',name:'John Mwangi Transport',phone:'0722100001',vehicle:'Canter 5 ton',capacityTons:5,baseLat:-1.2921,baseLon:36.8219,baseAddr:'Nairobi CBD',baseComment:'Available Mon–Sat from 5am',network:'safaricom',pref:'both',ratePerKm:50,status:'Active',joined:'2024-06-01'},
-    {id:'TR-AW02',userId:'USR-AW02',name:'Alice Wanjiku Logistics',phone:'0723200002',vehicle:'Pickup 1 ton',capacityTons:1,baseLat:-1.2725,baseLon:36.8311,baseAddr:'Kiambu Road, Nairobi',baseComment:'Specialises in small parcels and perishables',network:'safaricom',pref:'both',ratePerKm:70,status:'Active',joined:'2024-07-15'},
-    {id:'TR-DO03',userId:'USR-DO03',name:'David Otieno Carriers',phone:'0720300003',vehicle:'Lorry 10 ton',capacityTons:10,baseLat:-1.0525,baseLon:36.6824,baseAddr:'Kiambu Town',baseComment:'Long-distance haulage, Nairobi–Mombasa–Kisumu',network:'airtel',pref:'rfq',ratePerKm:80,status:'Active',joined:'2024-08-01'},
-    {id:'TR-GN04',userId:'USR-GN04',name:'Grace Njeri Refrigerated',phone:'0711400004',vehicle:'Refrigerated van',capacityTons:2,baseLat:-1.2800,baseLon:36.8400,baseAddr:'Westlands, Nairobi',baseComment:'Cold chain certified. Fresh produce, dairy, meat.',network:'safaricom',pref:'both',ratePerKm:90,status:'Active',joined:'2024-09-10'},
-    {id:'TR-PK05',userId:'USR-PK05',name:'Peter Kamau Haulage',phone:'0712500005',vehicle:'Canter 5 ton',capacityTons:5,baseLat:-1.3100,baseLon:36.8050,baseAddr:'South B, Nairobi',baseComment:'Construction materials, Nairobi and Central Kenya',network:'airtel',pref:'both',ratePerKm:60,status:'Active',joined:'2024-10-20'}
+    {id:'TR-JM01',userId:'USR-JM01',name:'John Mwangi Transport',phone:'0722100001',vehicle:'Canter 5 ton',capacityTons:5,baseLat:-1.2921,baseLon:36.8219,baseAddr:'Nairobi CBD',baseComment:'Available Mon–Sat from 5am',network:'safaricom',pref:'both',ratePerKm:50,plate:'KDA 245B',status:'Active',joined:'2024-06-01'},
+    {id:'TR-AW02',userId:'USR-AW02',name:'Alice Wanjiku Logistics',phone:'0723200002',vehicle:'Pickup 1 ton',capacityTons:1,baseLat:-1.2725,baseLon:36.8311,baseAddr:'Kiambu Road, Nairobi',baseComment:'Specialises in small parcels and perishables',network:'safaricom',pref:'both',ratePerKm:70,plate:'KCP 118M',status:'Active',joined:'2024-07-15'},
+    {id:'TR-DO03',userId:'USR-DO03',name:'David Otieno Carriers',phone:'0720300003',vehicle:'Lorry 10 ton',capacityTons:10,baseLat:-1.0525,baseLon:36.6824,baseAddr:'Kiambu Town',baseComment:'Long-distance haulage, Nairobi–Mombasa–Kisumu',network:'airtel',pref:'rfq',ratePerKm:80,plate:'KDG 902L',status:'Active',joined:'2024-08-01'},
+    {id:'TR-GN04',userId:'USR-GN04',name:'Grace Njeri Refrigerated',phone:'0711400004',vehicle:'Refrigerated van',capacityTons:2,baseLat:-1.2800,baseLon:36.8400,baseAddr:'Westlands, Nairobi',baseComment:'Cold chain certified. Fresh produce, dairy, meat.',network:'safaricom',pref:'both',ratePerKm:90,plate:'KBZ 671T',status:'Active',joined:'2024-09-10'},
+    {id:'TR-PK05',userId:'USR-PK05',name:'Peter Kamau Haulage',phone:'0712500005',vehicle:'Canter 5 ton',capacityTons:5,baseLat:-1.3100,baseLon:36.8050,baseAddr:'South B, Nairobi',baseComment:'Construction materials, Nairobi and Central Kenya',network:'airtel',pref:'both',ratePerKm:60,plate:'KDF 330J',status:'Active',joined:'2024-10-20'}
   ];
   DB.clients=[
     {id:'CL-GT06',userId:'USR-GT06',name:'Greenleaf Tea Ltd',phone:'0701600006',joined:'2024-08-20'},
@@ -2211,7 +2281,7 @@ function demoLogin(phone){
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   QA TEST SUITE — 30 groups, 165 assertions
+   QA TEST SUITE — 30 groups, 180 assertions
 ═══════════════════════════════════════════════════════════════════ */
 async function runQA(stress=false){
   const LOG=G('qa-log'),SUM=G('qa-summary');LOG.innerHTML='';SUM.innerHTML='';
@@ -2559,12 +2629,37 @@ async function runQA(stress=false){
     DB.bookings=DB.bookings.filter(b=>!['BK-PAYTEST','BK-PAYTEST2'].includes(b.id));
     log('');
 
-    // [23] Vehicle list parity (client preference vs transporter registration)
-    log('[23] Vehicle list parity');
-    const trVehicles=['Motorbike (boda)','Tuk Tuk','Pickup 1 ton','Canter 3 ton','Canter 5 ton','Lorry 10 ton','Flatbed 8 ton','Refrigerated van','Semi-trailer 30 ton'];
+    // [23] Vehicle auto-fill & network detection (Kenya-specific automation)
+    log('[23] Vehicle auto-fill & network detection');
     const clVprefOptions=Array.from(document.querySelectorAll('#cl-vpref option')).map(o=>o.textContent).filter(t=>t!=='Any');
-    assert('Client vehicle-preference list matches transporter registration list',trVehicles.every(v=>clVprefOptions.includes(v)),`${clVprefOptions.length}/${trVehicles.length} vehicles available`);
-    assert('All floor rates cover every vehicle type',trVehicles.every(v=>DB.settings.floors[v]!==undefined));log('');
+    assert('Client vehicle-preference dropdown is populated from the single shared VEHICLES list',VEHICLE_NAMES.every(v=>clVprefOptions.includes(v))&&clVprefOptions.length===VEHICLE_NAMES.length);
+    assert('All floor rates cover every vehicle in the shared list (single source, no drift possible)',VEHICLE_NAMES.every(v=>DB.settings.floors[v]!==undefined));
+
+    // Capacity auto-fill: vehicles whose label states a tonnage must auto-fill exactly that number
+    assert('Pickup 1 ton auto-fills 1',vehicleCapacity('Pickup 1 ton')===1);
+    assert('Canter 3 ton auto-fills 3',vehicleCapacity('Canter 3 ton')===3);
+    assert('Canter 5 ton auto-fills 5',vehicleCapacity('Canter 5 ton')===5);
+    assert('Flatbed 8 ton auto-fills 8',vehicleCapacity('Flatbed 8 ton')===8);
+    assert('Lorry 10 ton auto-fills 10',vehicleCapacity('Lorry 10 ton')===10);
+    assert('Semi-trailer 30 ton auto-fills 30',vehicleCapacity('Semi-trailer 30 ton')===30);
+    assert('Unknown vehicle name returns empty rather than throwing',vehicleCapacity('Not a real vehicle')==='');
+
+    // End-to-end: changing the vehicle dropdown must actually update the capacity field in the DOM
+    switchTab('tr-profile');
+    G('tr-veh').value='Lorry 10 ton';autoFillVehicleDefaults();
+    assert('Selecting a vehicle in the real form auto-fills the capacity field',G('tr-cap').value==='10');
+    assert('The rate hint updates to reference the new vehicle\'s floor',G('tr-rate-hint').textContent.includes(String(vehicleFloor('Lorry 10 ton'))));
+    G('tr-veh').value='Motorbike (boda)';autoFillVehicleDefaults();
+    assert('Switching vehicle again re-fills capacity for the new selection',G('tr-cap').value===String(vehicleCapacity('Motorbike (boda)')));
+
+    // Network detection — known Kenyan prefixes, and an honest "don't guess" for unrecognised ones
+    assert('0722... detects as Safaricom',detectNetwork('0722100001')==='safaricom');
+    assert('0733... detects as Airtel',detectNetwork('0733100001')==='airtel');
+    assert('0773... detects as Telkom',detectNetwork('0773100001')==='telkom');
+    assert('254722... (international format) also detects correctly',detectNetwork('254722100001')==='safaricom');
+    assert('An unrecognised prefix returns null rather than a wrong guess',detectNetwork('0788800001')===null);
+    switchTab('qa'); // restore the visible panel — the checks above navigated away to exercise the real profile form
+    log('');
 
     // [24] Auth resilience — a real error inside sign-up/login must never leave the button stuck
     log('[24] Auth error resilience');
@@ -2825,6 +2920,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.map-search-wrap'))G
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&G('map-overlay').style.display!=='none')closeMap()});
 selectRole('transporter');
 G('cl-date').value=today();G('cl-date').min=today();
+G('cl-vpref').insertAdjacentHTML('beforeend',VEHICLE_NAMES.map(v=>`<option>${v}</option>`).join(''));
 if(SESSION){bootApp()}
 else{apiFetch(6000);} // warm the local cache in the background so sign-up/login usually resolve instantly, without ever blocking the auth screen from being usable right away
 </script>
